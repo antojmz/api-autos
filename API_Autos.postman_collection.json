@@ -1,0 +1,1104 @@
+{
+  "info": {
+    "name": "API Concesionario de Autos",
+    "description": "Colección para probar la API demo (FastAPI + PostgreSQL).\n\n1. Levanta la API: `uvicorn app.main:app --reload --host 127.0.0.1 --port 8000`\n2. Ejecuta las carpetas en orden (o la colección completa con el Collection Runner).\n\nLas variables `autoId` y `modeloId` se rellenan solas al crear recursos. Si usas otro host/puerto, cambia la variable `baseUrl`.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:8000"
+    },
+    {
+      "key": "autoId",
+      "value": ""
+    },
+    {
+      "key": "modeloId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "1. General",
+      "description": "Comprobar que la API responde.",
+      "item": [
+        {
+          "name": "Bienvenida",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código HTTP 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": []
+            },
+            "description": "Endpoint raíz con enlace a la documentación."
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Autos",
+      "description": "CRUD de autos (flujo correcto).",
+      "item": [
+        {
+          "name": "Crear auto",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código HTTP 201\", function () { pm.response.to.have.status(201); });",
+                  "const j = pm.response.json();",
+                  "pm.collectionVariables.set(\"autoId\", j.id);",
+                  "pm.test(\"Devuelve id y marca\", function () { pm.expect(j.id).to.be.a(\"number\"); pm.expect(j.marca).to.eql(\"Toyota\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/autos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "autos"
+              ]
+            },
+            "description": "Crea un auto. Guarda su id en la variable `autoId`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"marca\": \"Toyota\",\n  \"fecha_ingreso\": \"2026-01-10\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Listar autos (paginado)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Forma de página\", function () { pm.expect(pm.response.json()).to.have.keys(\"total\", \"skip\", \"limit\", \"items\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/autos?skip=0&limit=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "autos"
+              ],
+              "query": [
+                {
+                  "key": "skip",
+                  "value": "0"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Lista paginada: `skip` (desde) y `limit` (1 a 100)."
+          }
+        },
+        {
+          "name": "Filtrar autos por marca",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Encuentra el auto creado\", function () {",
+                  "    const ids = pm.response.json().items.map(a => a.id);",
+                  "    pm.expect(ids).to.include(Number(pm.collectionVariables.get(\"autoId\")));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/autos?marca=toy",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "autos"
+              ],
+              "query": [
+                {
+                  "key": "marca",
+                  "value": "toy"
+                }
+              ]
+            },
+            "description": "Filtro por marca: contiene, sin distinguir mayúsculas."
+          }
+        },
+        {
+          "name": "Obtener auto por ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código HTTP 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/autos/{{autoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "autos",
+                "{{autoId}}"
+              ]
+            },
+            "description": "Obtiene un auto por su id."
+          }
+        },
+        {
+          "name": "Actualizar auto (PUT)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Marca actualizada\", function () { pm.expect(pm.response.json().marca).to.eql(\"Toyota Motor\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/autos/{{autoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "autos",
+                "{{autoId}}"
+              ]
+            },
+            "description": "PUT es reemplazo completo: se envían todos los campos.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"marca\": \"Toyota Motor\",\n  \"fecha_ingreso\": \"2026-01-05\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Modelos",
+      "description": "Modelos asociados a un auto.",
+      "item": [
+        {
+          "name": "Crear modelo",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código HTTP 201\", function () { pm.response.to.have.status(201); });",
+                  "const j = pm.response.json();",
+                  "pm.collectionVariables.set(\"modeloId\", j.id);",
+                  "pm.test(\"Precio como string decimal exacto\", function () { pm.expect(j.precio).to.eql(\"25990.50\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/modelo",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "modelo"
+              ]
+            },
+            "description": "Crea un modelo para el auto `autoId`. Guarda su id en `modeloId`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"auto_id\": {{autoId}},\n  \"nombre\": \"Corolla\",\n  \"anio\": 2024,\n  \"precio\": 25990.50,\n  \"fecha_ingreso\": \"2026-02-01\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Crear otro modelo (fecha por defecto = hoy)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código HTTP 201\", function () { pm.response.to.have.status(201); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/modelo",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "modelo"
+              ]
+            },
+            "description": "Sin `fecha_ingreso`: la API usa la fecha de hoy.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"auto_id\": {{autoId}},\n  \"nombre\": \"Yaris\",\n  \"anio\": 2025,\n  \"precio\": 18000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Listar autos con sus modelos",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"El auto tiene 2 modelos\", function () {",
+                  "    const id = Number(pm.collectionVariables.get(\"autoId\"));",
+                  "    const auto = pm.response.json().items.find(a => a.id === id);",
+                  "    pm.expect(auto.modelos).to.have.lengthOf(2);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/modelos/autos?skip=0&limit=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "modelos",
+                "autos"
+              ],
+              "query": [
+                {
+                  "key": "skip",
+                  "value": "0"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Autos con sus modelos anidados (paginado)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Validación y seguridad",
+      "description": "Casos de error esperados (OWASP: validación estricta y errores sin detalles internos).",
+      "item": [
+        {
+          "name": "Auto: marca vacía",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código HTTP 422\", function () { pm.response.to.have.status(422); });",
+                  "pm.test(\"Errores saneados (sin eco del input)\", function () {",
+                  "    const j = pm.response.json();",
+                  "    pm.expect(j.errores).to.be.an(\"array\").that.is.not.empty;",
+                  "    j.errores.forEach(e => { pm.expect(e).to.have.keys(\"campo\", \"mensaje\"); });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/autos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "autos"
+              ]
+            },
+            "description": "Espacios se recortan y queda < 2 caracteres.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"marca\": \"  \"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Auto: campo extra (mass assignment)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código HTTP 422\", function () { pm.response.to.have.status(422); });",
+                  "pm.test(\"Errores saneados (sin eco del input)\", function () {",
+                  "    const j = pm.response.json();",
+                  "    pm.expect(j.errores).to.be.an(\"array\").that.is.not.empty;",
+                  "    j.errores.forEach(e => { pm.expect(e).to.have.keys(\"campo\", \"mensaje\"); });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/autos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "autos"
+              ]
+            },
+            "description": "No se permite enviar `id` ni otros campos no declarados.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"marca\": \"Kia\",\n  \"id\": 99\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Auto: caracteres no permitidos (XSS)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código HTTP 422\", function () { pm.response.to.have.status(422); });",
+                  "pm.test(\"Errores saneados (sin eco del input)\", function () {",
+                  "    const j = pm.response.json();",
+                  "    pm.expect(j.errores).to.be.an(\"array\").that.is.not.empty;",
+                  "    j.errores.forEach(e => { pm.expect(e).to.have.keys(\"campo\", \"mensaje\"); });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/autos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "autos"
+              ]
+            },
+            "description": "Solo letras, números y separadores simples.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"marca\": \"<script>alert(1)</script>\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Auto: fecha futura",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código HTTP 422\", function () { pm.response.to.have.status(422); });",
+                  "pm.test(\"Errores saneados (sin eco del input)\", function () {",
+                  "    const j = pm.response.json();",
+                  "    pm.expect(j.errores).to.be.an(\"array\").that.is.not.empty;",
+                  "    j.errores.forEach(e => { pm.expect(e).to.have.keys(\"campo\", \"mensaje\"); });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/autos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "autos"
+              ]
+            },
+            "description": "La fecha de ingreso no puede ser futura.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"marca\": \"Kia\",\n  \"fecha_ingreso\": \"2099-01-01\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Auto: JSON mal formado",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código HTTP 422\", function () { pm.response.to.have.status(422); });",
+                  "pm.test(\"Errores saneados (sin eco del input)\", function () {",
+                  "    const j = pm.response.json();",
+                  "    pm.expect(j.errores).to.be.an(\"array\").that.is.not.empty;",
+                  "    j.errores.forEach(e => { pm.expect(e).to.have.keys(\"campo\", \"mensaje\"); });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/autos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "autos"
+              ]
+            },
+            "description": "Cuerpo que no es JSON válido.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"marca\": ",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Listar: limit fuera de rango",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código HTTP 422\", function () { pm.response.to.have.status(422); });",
+                  "pm.test(\"Errores saneados (sin eco del input)\", function () {",
+                  "    const j = pm.response.json();",
+                  "    pm.expect(j.errores).to.be.an(\"array\").that.is.not.empty;",
+                  "    j.errores.forEach(e => { pm.expect(e).to.have.keys(\"campo\", \"mensaje\"); });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/autos?limit=1000",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "autos"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "1000"
+                }
+              ]
+            },
+            "description": "`limit` máximo es 100."
+          }
+        },
+        {
+          "name": "Obtener: ID no numérico",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código HTTP 422\", function () { pm.response.to.have.status(422); });",
+                  "pm.test(\"Errores saneados (sin eco del input)\", function () {",
+                  "    const j = pm.response.json();",
+                  "    pm.expect(j.errores).to.be.an(\"array\").that.is.not.empty;",
+                  "    j.errores.forEach(e => { pm.expect(e).to.have.keys(\"campo\", \"mensaje\"); });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/autos/abc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "autos",
+                "abc"
+              ]
+            },
+            "description": "El id debe ser un entero > 0."
+          }
+        },
+        {
+          "name": "Obtener: ID inexistente",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código HTTP 404\", function () { pm.response.to.have.status(404); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/autos/999999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "autos",
+                "999999"
+              ]
+            },
+            "description": "Recurso que no existe."
+          }
+        },
+        {
+          "name": "Filtro con intento de inyección SQL",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"No devuelve registros\", function () { pm.expect(pm.response.json().items).to.be.empty; });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/autos?marca=%27%20OR%201%3D1%20--",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "autos"
+              ],
+              "query": [
+                {
+                  "key": "marca",
+                  "value": "%27%20OR%201%3D1%20--"
+                }
+              ]
+            },
+            "description": "El valor se envía como parámetro al motor: se busca como texto literal."
+          }
+        },
+        {
+          "name": "Modelo: auto inexistente",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código HTTP 404\", function () { pm.response.to.have.status(404); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/modelo",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "modelo"
+              ]
+            },
+            "description": "El `auto_id` debe existir.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"auto_id\": 999999,\n  \"nombre\": \"X\",\n  \"anio\": 2024,\n  \"precio\": 100\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Modelo: año y precio inválidos",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código HTTP 422\", function () { pm.response.to.have.status(422); });",
+                  "pm.test(\"Errores saneados (sin eco del input)\", function () {",
+                  "    const j = pm.response.json();",
+                  "    pm.expect(j.errores).to.be.an(\"array\").that.is.not.empty;",
+                  "    j.errores.forEach(e => { pm.expect(e).to.have.keys(\"campo\", \"mensaje\"); });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/modelo",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "modelo"
+              ]
+            },
+            "description": "Año >= 1886 y precio > 0.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"auto_id\": {{autoId}},\n  \"nombre\": \"X\",\n  \"anio\": 1700,\n  \"precio\": -5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Modelo: precio con 3 decimales",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código HTTP 422\", function () { pm.response.to.have.status(422); });",
+                  "pm.test(\"Errores saneados (sin eco del input)\", function () {",
+                  "    const j = pm.response.json();",
+                  "    pm.expect(j.errores).to.be.an(\"array\").that.is.not.empty;",
+                  "    j.errores.forEach(e => { pm.expect(e).to.have.keys(\"campo\", \"mensaje\"); });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/modelo",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "modelo"
+              ]
+            },
+            "description": "Máximo 2 decimales.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"auto_id\": {{autoId}},\n  \"nombre\": \"Yaris\",\n  \"anio\": 2025,\n  \"precio\": 1.234\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Modelo: fecha anterior a la del auto",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código HTTP 422\", function () { pm.response.to.have.status(422); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/modelo",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "modelo"
+              ]
+            },
+            "description": "Un modelo no puede ingresar antes que su auto.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"auto_id\": {{autoId}},\n  \"nombre\": \"Corolla\",\n  \"anio\": 2024,\n  \"precio\": 25990,\n  \"fecha_ingreso\": \"2025-12-01\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Auto: PUT incompleto",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código HTTP 422\", function () { pm.response.to.have.status(422); });",
+                  "pm.test(\"Errores saneados (sin eco del input)\", function () {",
+                  "    const j = pm.response.json();",
+                  "    pm.expect(j.errores).to.be.an(\"array\").that.is.not.empty;",
+                  "    j.errores.forEach(e => { pm.expect(e).to.have.keys(\"campo\", \"mensaje\"); });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/autos/{{autoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "autos",
+                "{{autoId}}"
+              ]
+            },
+            "description": "PUT exige todos los campos.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"marca\": \"Toyota\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Auto: PUT con fecha posterior a sus modelos",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código HTTP 409\", function () { pm.response.to.have.status(409); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/autos/{{autoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "autos",
+                "{{autoId}}"
+              ]
+            },
+            "description": "Dejaría modelos con fecha anterior a su auto: conflicto.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"marca\": \"Toyota\",\n  \"fecha_ingreso\": \"2026-03-01\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Limpieza",
+      "description": "Elimina el auto creado (y sus modelos en cascada).",
+      "item": [
+        {
+          "name": "Eliminar auto",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código HTTP 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/autos/{{autoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "autos",
+                "{{autoId}}"
+              ]
+            },
+            "description": "Borra el auto y sus modelos."
+          }
+        },
+        {
+          "name": "Confirmar eliminación",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código HTTP 404\", function () { pm.response.to.have.status(404); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/autos/{{autoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "autos",
+                "{{autoId}}"
+              ]
+            },
+            "description": "Tras borrar, el auto ya no existe."
+          }
+        }
+      ]
+    }
+  ]
+}
