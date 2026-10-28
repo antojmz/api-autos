@@ -13,12 +13,9 @@ Estructura del proyecto:
 Este archivo crea la aplicación, configura la seguridad básica (CORS y
 cabeceras), define el manejo centralizado de errores y registra los routers.
 
-Cómo ejecutarla (desde la carpeta del proyecto):
-    python3 -m venv .venv
-    source .venv/bin/activate
-    pip install -r requirements.txt
-    alembic upgrade head
-    uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+Cómo ejecutarla (con Docker, desde la carpeta del proyecto; ver README.md):
+    docker compose build     # construye la imagen (venv en /opt/venv)
+    docker compose up -d     # aplica migraciones y arranca uvicorn
 Documentación interactiva: http://127.0.0.1:8000/docs  (o /redoc)
 """
 
@@ -156,10 +153,3 @@ app.include_router(modelos.router)
 @app.get("/", tags=["General"], summary="Bienvenida")
 def raiz() -> dict[str, str]:
     return {"mensaje": "API Concesionario de Autos", "documentacion": "/docs"}
-
-
-# Permite también ejecutar con: python -m app.main
-if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run("app.main:app", host="127.0.0.1", port=8000, reload=True)
