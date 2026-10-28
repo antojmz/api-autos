@@ -1,0 +1,35 @@
+# =============================================================================
+# docker-compose.yml — Levanta la API en un contenedor.
+#
+# PostgreSQL NO corre en Docker: se usa el que está instalado en la máquina
+# (host). Desde dentro del contenedor, "localhost" es el propio contenedor,
+# por eso se llega al host con el nombre especial "host.docker.internal".
+#
+#   docker compose build        # construir la imagen
+#   docker compose up -d        # levantar en segundo plano
+#   docker compose logs -f api  # ver logs
+#   docker compose down         # detener y eliminar el contenedor
+# =============================================================================
+
+services:
+  api:
+    build: .
+    image: api-autos:latest
+    container_name: api-autos
+    # Credenciales y configuración desde .env (no se copian a la imagen).
+    env_file: .env
+    environment:
+      # Sobrescribe DB_HOST=localhost del .env para apuntar al PostgreSQL del host.
+      DB_HOST: host.docker.internal
+      # Aplica `alembic upgrade head` al arrancar (false para desactivarlo).
+      RUN_MIGRATIONS: "true"
+    # En Docker Desktop (Mac/Windows) host.docker.internal ya existe; esta
+    # línea lo habilita también en Linux.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      # "ip:puerto_del_host:puerto_del_contenedor". Solo en 127.0.0.1: la API
+      # no queda expuesta a otras máquinas de la red. El puerto del host es
+      # 8000 por defecto; si está ocupado: API_PORT=8001 docker compose up -d
+      - "127.0.0.1:${API_PORT:-8000}:8000"
+    restart: unless-stopped
