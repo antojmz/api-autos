@@ -1,5 +1,6 @@
 # =============================================================================
-# pr-title — Valida que el título de cada PR siga Conventional Commits.
+# pr-title — Pone el título de cada PR a partir del nombre de la rama y valida
+# que siga Conventional Commits.
 #
 # Con "squash merge", el título del PR se convierte en el mensaje del commit en
 # main, y release-please decide la versión a partir de él:
@@ -7,44 +8,132 @@
 #   fix: ...    -> parche        (1.0.0 -> 1.0.1)
 #   feat!: ...  -> mayor         (1.0.0 -> 2.0.0)
 #
-# Se usa el evento pull_request (no pull_request_target): el workflow no
-# necesita secretos ni permisos de escritura, solo leer el PR.
+# Convención de ramas:  tipo/scope/descripcion   (el scope es opcional)
+#   feat/api-autos/filtro-por-fechas  ->  feat(api-autos): filtro por fechas
+#   fix/login-lento                   ->  fix: login lento
+#   feature/config                    ->  feat: config      (alias: feature=feat)
+#
+# Reglas:
+#   - Si el título del PR YA es convencional, se respeta (no se toca).
+#   - Si no lo es, se reemplaza por el generado desde la rama.
+#   - Si tampoco la rama sigue la convención, el check falla explicando cómo
+#     corregirlo (renombrar la rama o editar el título a mano).
+#
+# Todo ocurre en UN solo paso: un título cambiado con GITHUB_TOKEN no dispara
+# un nuevo evento "edited", así que generar y validar en workflows separados
+# dejaría la validación con el título viejo.
+#
+# Docs: docs/releases.md (sección "Nombres de rama y título automático del PR").
 # =============================================================================
 name: pr-title
 
 on:
   pull_request:
-    types: [opened, edited, synchronize, reopened]
+    types: [opened, edited, reopened, synchronize]
 
+# Permiso mínimo necesario: escribir en el PR para cambiar su título.
 permissions:
-  pull-requests: read
+  pull-requests: write
 
 jobs:
-  validar-titulo:
+  titulo:
     runs-on: ubuntu-latest
     steps:
-      - uses: amannn/action-semantic-pull-request@v5
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/github-script@v8
         with:
-          types: |
-            feat
-            fix
-            perf
-            refactor
-            docs
-            test
-            build
-            ci
-            chore
-            revert
-          # Scope opcional: la parte del monorepo afectada, p. ej. feat(api-usuarios): ...
-          scopes: |
-            api-autos
-            api-usuarios
-            auth-jwt
-            web
-            docs
-            monorepo
-            main
-          requireScope: false
+          # Seguridad: el script lee el título y la rama desde `context.payload`
+          # (datos), nunca interpolando ${{ github.event... }} dentro del código,
+          # porque un título o nombre de rama malicioso podría inyectar JavaScript.
+          script: |
+            // ---- Tipos y scopes permitidos (única fuente de verdad) --------
+            // Si se añade un servicio, app o librería al monorepo, agregar su scope aquí.
+            const TIPOS = ['feat', 'fix', 'perf', 'refactor', 'docs', 'test', 'build', 'ci', 'chore', 'revert'];
+            const SCOPES = ['api-autos', 'api-usuarios', 'auth-jwt', 'web', 'docs', 'monorepo', 'main'];
+            // Nombres de rama habituales que equivalen a un tipo convencional.
+            const ALIAS = { feature: 'feat', hotfix: 'fix', bugfix: 'fix', doc: 'docs' };
+
+            // Título válido: tipo(scope opcional)!opcional: descripción
+            const TITULO_VALIDO = new RegExp(
+              `^(${TIPOS.join('|')})(\\((${SCOPES.join('|')})\\))?!?: \\S.*$`
+            );
+
+            const pr = context.payload.pull_request;
+            const rama = pr.head.ref;
+            const tituloActual = pr.title.trim();
+
+            /** Genera el título desde la rama, o devuelve {error} explicando por qué no se puede. */
+            function tituloDesdeRama(nombre) {
+              const segmentos = nombre.split('/').filter(Boolean);
+              if (segmentos.length < 2) {
+                return { error: `la rama "${nombre}" no tiene el formato tipo/descripcion` };
+              }
+              const crudo = segmentos[0].toLowerCase();
+              const tipo = ALIAS[crudo] ?? crudo;
+              if (!TIPOS.includes(tipo)) {
+                return { error: `"${segmentos[0]}" no es un tipo válido (usa: ${TIPOS.join(', ')}; alias: ${Object.keys(ALIAS).join(', ')})` };
+              }
+              let scope = null;
+              let resto = segmentos.slice(1);
+              // Con 3 segmentos o más, el segundo es el scope.
+              if (segmentos.length >= 3) {
+                scope = segmentos[1].toLowerCase();
+                if (!SCOPES.includes(scope)) {
+                  return { error: `"${segmentos[1]}" no es un scope válido (usa: ${SCOPES.join(', ')})` };
+                }
+                resto = segmentos.slice(2);
+              }
+              const descripcion = resto.join(' ').replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim();
+              if (!descripcion) {
+                return { error: `la rama "${nombre}" no tiene descripción` };
+              }
+              return { titulo: `${tipo}${scope ? `(${scope})` : ''}: ${descripcion}` };
+            }
+
+            // 1. PR de release-please: su título lo genera release-please; solo se valida.
+            if (rama.startsWith('release-please--')) {
+              if (!TITULO_VALIDO.test(tituloActual)) {
+                core.setFailed(`Título del PR de release no convencional: "${tituloActual}"`);
+              }
+              return;
+            }
+
+            // 2. El autor ya puso un título convencional: se respeta.
+            if (TITULO_VALIDO.test(tituloActual)) {
+              core.info(`Título convencional, se mantiene: "${tituloActual}"`);
+              return;
+            }
+
+            // 3. Se genera desde la rama.
+            const generado = tituloDesdeRama(rama);
+            if (generado.error) {
+              core.setFailed(
+                `El título "${tituloActual}" no sigue Conventional Commits y no se pudo generar desde la rama: ${generado.error}.\n` +
+                `Soluciones: renombra la rama a tipo/scope/descripcion (p. ej. feat/api-autos/filtro-por-fechas) ` +
+                `o edita el título del PR a mano (p. ej. "feat(api-autos): filtro por fechas").`
+              );
+              return;
+            }
+
+            try {
+              await github.rest.pulls.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pr.number,
+                title: generado.titulo,
+              });
+            } catch (error) {
+              // Típico en PRs desde un fork: el GITHUB_TOKEN es de solo lectura.
+              core.setFailed(
+                `No se pudo cambiar el título (${error.message}). Edítalo a mano como: "${generado.titulo}"`
+              );
+              return;
+            }
+
+            core.info(`Título actualizado: "${tituloActual}" -> "${generado.titulo}"`);
+            await core.summary
+              .addHeading('Título del PR generado desde la rama')
+              .addTable([
+                [{ data: 'Rama', header: true }, { data: 'Antes', header: true }, { data: 'Ahora', header: true }],
+                [rama, tituloActual, generado.titulo],
+              ])
+              .write();

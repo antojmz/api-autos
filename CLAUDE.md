@@ -59,6 +59,8 @@ Cada servicio tiene su propio `CLAUDE.md` con sus reglas. **Antes de tocar un se
 - **Conventional Commits obligatorio**: `tipo(scope opcional): descripción en español`.
   - Tipos: `feat`, `fix`, `perf`, `refactor`, `docs`, `test`, `build`, `ci`, `chore` y `revert`.
   - Scopes: `api-autos`, `api-usuarios`, `auth-jwt`, `web`, `docs` y `monorepo`.
+- **Nombres de rama**: `tipo/scope/descripcion` (el scope es opcional), por ejemplo `feat/api-autos/filtro-por-fechas`. El workflow `.github/workflows/pr-title.yml` genera con ella el título del PR (`feat(api-autos): filtro por fechas`) cuando el título no es convencional, y lo valida.
+  - Los tipos, scopes y alias permitidos están definidos **en ese workflow**: al añadir un servicio, app o librería, agrega su scope allí.
   - Para un cambio incompatible: `feat!:` o el pie `BREAKING CHANGE:`.
 - release-please calcula la versión a partir de esos mensajes. Usa una **sola versión para todo el repo**, con tags `vX.Y.Z`.
 - **No editar a mano** `version.txt`, `.release-please-manifest.json`, `CHANGELOG.md` ni las líneas marcadas `# x-release-please-version` (`version=` en los `main.py`, y `version` en `libs/auth-jwt/pyproject.toml`).

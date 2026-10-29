@@ -75,12 +75,41 @@ ci: cachear la instalación de dependencias
 
 **Opción recomendada: PR con squash merge.**
 - El título del PR se convierte en el único commit en `main`, así que el **título** debe ser convencional.
-- El workflow `.github/workflows/pr-title.yml` lo valida en cada PR: si el título no sigue la convención, el check falla.
+- El workflow `.github/workflows/pr-title.yml` **genera el título desde el nombre de la rama** si el que tiene el PR no es convencional, y lo valida. Si no puede generarlo ni el título es válido, el check falla (ver la sección siguiente).
 
 **Opción con merge local** (`git merge --no-ff feature/x` y `git push`):
 - release-please lee los commits de la rama, que deben ser convencionales.
 - Los commits `Merge branch '...'` se ignoran.
 - En este caso no hay PR, así que no actúa la validación automática: revisa tú los mensajes.
+
+## Nombres de rama y título automático del PR
+
+Nombra las ramas con el formato **`tipo/scope/descripcion`**. El scope es opcional:
+
+| Rama | Título que genera el workflow |
+|---|---|
+| `feat/api-autos/filtro-por-fechas` | `feat(api-autos): filtro por fechas` |
+| `fix/web/cookie_segura` | `fix(web): cookie segura` |
+| `fix/login-lento` | `fix: login lento` |
+| `docs/guia-de-despliegue` | `docs: guia de despliegue` |
+| `feature/config` | `feat: config` (alias) |
+
+- **Tipos**: los de Conventional Commits (tabla de arriba). Alias admitidos: `feature` → `feat`, `hotfix` y `bugfix` → `fix`, `doc` → `docs`.
+- **Scope**: si la rama tiene 3 segmentos o más, el segundo debe ser un scope válido: `api-autos`, `api-usuarios`, `auth-jwt`, `web`, `docs`, `monorepo` o `main`.
+- **Descripción**: el resto de la rama; los `-` y `_` se convierten en espacios.
+
+Al abrir o actualizar un PR, el workflow `pr-title`:
+1. **Respeta el título** si ya es convencional. Así puedes escribir uno más descriptivo a mano, por ejemplo con tildes, que en la rama no conviene usar.
+2. Si no lo es, **lo reemplaza** por el generado desde la rama. Verás el cambio en el PR y un resumen en la ejecución del workflow.
+3. Si la rama tampoco sigue el formato (por ejemplo `mi-rama` o `feat/scope-inventado/x`), el check **falla** y explica el motivo. Para arreglarlo, renombra la rama o edita el título a mano, y el check se vuelve a ejecutar solo.
+
+**Cambios incompatibles** (versión mayor): la rama no puede expresar el `!`. Edita el título a mano, por ejemplo `feat(api-autos)!: nuevo formato de filtros`. Como ya es convencional, el workflow lo respeta.
+
+El PR que abre release-please (`chore(main): release X.Y.Z`) no se renombra; solo se valida.
+
+Los tipos, scopes y alias viven en `.github/workflows/pr-title.yml`. Si añades un servicio, app o librería al monorepo, agrega su scope ahí.
+
+**Limitación**: en un PR desde un *fork*, el token de GitHub Actions es de solo lectura y no puede cambiar el título. El check falla indicando el título que debes poner a mano.
 
 ## Ajustes necesarios en GitHub (una sola vez)
 
