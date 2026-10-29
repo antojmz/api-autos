@@ -29,6 +29,10 @@ export default defineNuxtConfig({
   ],
   vite: {
     vue: { template: { transformAssetUrls } },
+    // Desarrollo en Docker (`just dev`): en macOS los cambios que llegan por
+    // bind mount no siempre generan eventos del sistema de archivos dentro del
+    // contenedor; con polling, Vite revisa los archivos periódicamente.
+    server: { watch: { usePolling: process.env.NUXT_WATCH_POLLING === 'true' } },
   },
 
   app: {

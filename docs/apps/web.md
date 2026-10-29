@@ -87,9 +87,16 @@ La imagen (`apps/web/Dockerfile`):
 
 ---
 
-## 4. Desarrollo local (recarga en caliente)
+## 4. Desarrollo (recarga en caliente)
 
-Requiere **Node.js 24.15 o superior** (lo exige Nuxt 4.6) y las APIs levantadas con Docker.
+**Recomendado: `just dev`** (desde la raíz). Levanta las APIs y el frontend en el contenedor `web-dev`:
+- `nuxt dev` monta `apps/web` y recarga al guardar (HMR).
+- No necesitas Node instalado.
+- Las dependencias de Linux van en un volumen propio (`web_node_modules`).
+- Si añades un paquete a `package.json`, reinicia `just dev`.
+- `just typecheck` comprueba los tipos dentro del contenedor.
+
+**Alternativa sin Docker para el frontend**: requiere **Node.js 24.15 o superior** (lo exige Nuxt 4.6) y las APIs levantadas con Docker.
 
 ```bash
 docker compose up -d api-usuarios api-autos     # desde la raíz

@@ -45,7 +45,11 @@ Frontend en **Nuxt 4.6** + **Vuetify 4.3** (TypeScript, estructura `app/` de Nux
 ## Comandos
 
 ```bash
-# Desde apps/web (desarrollo; requiere Node >= 24.15 y las APIs en Docker)
+# Recomendado (desde la raíz): todo en Docker con recarga en caliente
+just dev            # web-dev (nuxt dev) + APIs; no requiere Node local
+just typecheck      # DEBE pasar sin errores
+
+# Alternativa desde apps/web (requiere Node >= 24.15 y las APIs en Docker)
 npm install
 npm run dev          # http://localhost:3000
 npm run typecheck    # DEBE pasar sin errores

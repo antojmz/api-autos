@@ -50,6 +50,8 @@ docker compose exec api-autos alembic downgrade base && docker compose exec api-
 
 No hay tests automatizados en Python. La suite de verificación es la carpeta "2. API Autos" (46 peticiones con asserts) de la colección única `API_Monorepo.postman_collection.json`, en la raíz del monorepo. Debe pasar completa después de cualquier cambio. Obtiene los tokens en `api-usuarios` (carpeta "0. Autenticación") y necesita la variable `adminPassword`.
 
+**Desarrollo con recarga en caliente**: `just dev` (desde la raíz) monta `services/api-autos/app`, `alembic/` y `libs/auth-jwt/src` en el contenedor y arranca uvicorn con `--reload`. Los cambios en Python se aplican solos, sin reconstruir. Las migraciones nuevas se aplican con `just migrate api-autos`, y una dependencia nueva en `requirements.txt` exige reiniciar `just dev`. El modo se activa con `UVICORN_RELOAD=true` en `docker/entrypoint.sh`; en producción no se define.
+
 ## Arquitectura
 
 ```

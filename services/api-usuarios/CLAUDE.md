@@ -33,6 +33,8 @@ npx -y newman run API_Monorepo.postman_collection.json --folder "1. API Usuarios
 
 La carpeta "1. API Usuarios" (41 peticiones) de la colección única `API_Monorepo.postman_collection.json` (raíz) es la suite de verificación y debe pasar completa. Un test de colección comprueba, en **todas** las respuestas, que no aparezcan `password_hash` ni `$argon2`. Cada ejecución usa un `runId` único, porque los usuarios eliminados dejan reservados su username y su email.
 
+**Desarrollo con recarga en caliente**: `just dev` (desde la raíz) monta `services/api-usuarios/app`, `alembic/` y `libs/auth-jwt/src` en el contenedor y arranca uvicorn con `--reload`. Los cambios en Python se aplican solos, sin reconstruir. Las migraciones nuevas se aplican con `just migrate api-usuarios`, y una dependencia nueva en `requirements.txt` exige reiniciar `just dev`. El modo se activa con `UVICORN_RELOAD=true` en `docker/entrypoint.sh`; en producción no se define.
+
 ## Arquitectura
 
 ```

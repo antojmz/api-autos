@@ -1,0 +1,85 @@
+# =============================================================================
+# docker-compose.dev.yml — Modo DESARROLLO (recarga en caliente).
+#
+# No se usa solo: se COMBINA con docker-compose.yml, que sigue siendo la base:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+# (o simplemente `just dev`).
+#
+# Diferencia con producción:
+#   - Producción: las imágenes llevan una COPIA del código; cada cambio exige
+#     reconstruir (`docker compose up -d --build`).
+#   - Desarrollo: el código de tu máquina se MONTA dentro de los contenedores
+#     (bind mounts) y cada servicio se recarga solo al guardar un archivo.
+#
+# Qué NO se recarga solo (hay que reiniciar con `just dev`):
+#   - dependencias nuevas en requirements.txt o package.json,
+#   - cambios en Dockerfile, entrypoint o docker-compose*.yml,
+#   - migraciones nuevas: se aplican con `just migrate`.
+# =============================================================================
+
+# Configuración común de las dos APIs en desarrollo.
+x-api-dev: &api-dev
+  environment:
+    # uvicorn --reload (ver docker/entrypoint.sh de cada servicio).
+    UVICORN_RELOAD: "true"
+    # Docker Desktop en macOS no siempre propaga los eventos de cambio de
+    # archivos de un bind mount; con polling los cambios se detectan siempre.
+    WATCHFILES_FORCE_POLLING: "true"
+    # La copia MONTADA de la librería compartida tiene prioridad sobre la
+    # instalada en el venv de la imagen: los cambios en libs/ también se ven.
+    PYTHONPATH: /libs/auth-jwt/src
+
+services:
+  api-usuarios:
+    <<: *api-dev
+    # Las variables de x-servicio-python (docker-compose.yml) se mantienen:
+    # Compose fusiona los mapas `environment` de ambos archivos.
+    volumes:
+      # ":ro" = solo lectura: el contenedor no puede modificar tus archivos.
+      - ./services/api-usuarios/app:/app/app:ro
+      - ./services/api-usuarios/alembic:/app/alembic:ro
+      - ./libs/auth-jwt/src:/libs/auth-jwt/src:ro
+
+  api-autos:
+    <<: *api-dev
+    volumes:
+      - ./services/api-autos/app:/app/app:ro
+      - ./services/api-autos/alembic:/app/alembic:ro
+      - ./libs/auth-jwt/src:/libs/auth-jwt/src:ro
+
+  # El frontend de producción (build compilado) no se levanta en desarrollo:
+  # al asignarle un perfil, Compose solo lo arranca si se pide ese perfil.
+  web:
+    profiles: ["produccion"]
+
+  # Frontend en modo desarrollo: `nuxt dev` con recarga en caliente (HMR).
+  web-dev:
+    image: node:24-slim
+    container_name: web-dev
+    working_dir: /app
+    # npm ci instala las dependencias (para Linux) en el volumen node_modules;
+    # después arranca el servidor de desarrollo escuchando en todas las interfaces.
+    command: sh -c "npm ci --no-audit --no-fund && npm run dev -- --host 0.0.0.0 --port 3000"
+    environment:
+      NUXT_API_AUTOS_URL: http://api-autos:8000
+      NUXT_API_USUARIOS_URL: http://api-usuarios:8000
+      NUXT_COOKIE_SECURE: "false"
+      NUXT_TELEMETRY_DISABLED: "1"
+      # Polling para el watcher de Vite (ver nuxt.config.ts).
+      NUXT_WATCH_POLLING: "true"
+    volumes:
+      # Código del frontend de tu máquina.
+      - ./apps/web:/app
+      # node_modules en un volumen PROPIO del contenedor: así no se mezclan
+      # los binarios de Linux (contenedor) con los de macOS (tu node_modules local).
+      - web_node_modules:/app/node_modules
+    ports:
+      - "127.0.0.1:${WEB_PORT:-3000}:3000"
+    depends_on:
+      api-autos:
+        condition: service_healthy
+      api-usuarios:
+        condition: service_healthy
+
+volumes:
+  web_node_modules:

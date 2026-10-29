@@ -25,7 +25,20 @@ if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
     alembic upgrade head
 fi
 
+# Modo desarrollo (docker-compose.dev.yml, `just dev`): UVICORN_RELOAD=true
+# reinicia la API automáticamente al guardar un archivo. El código llega por
+# bind mount desde tu máquina, así que no hace falta reconstruir la imagen.
+# En producción esta variable no se define y uvicorn arranca sin --reload.
+if [ "${UVICORN_RELOAD:-false}" = "true" ]; then
+    set -- --reload --reload-dir /app/app
+    # La librería compartida, si está montada, también se vigila.
+    if [ -d /libs/auth-jwt/src ]; then
+        set -- "$@" --reload-dir /libs/auth-jwt/src
+    fi
+    echo "Modo desarrollo: recarga automática activada"
+fi
+
 echo "Iniciando la API en el puerto 8000..."
 # --host 0.0.0.0: dentro de un contenedor hay que escuchar en todas las
 # interfaces; con 127.0.0.1 la API no sería accesible desde fuera.
-exec uvicorn app.main:app --host 0.0.0.0 --port 8000
+exec uvicorn app.main:app --host 0.0.0.0 --port 8000 "$@"
