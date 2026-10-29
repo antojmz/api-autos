@@ -110,7 +110,8 @@ app = FastAPI(
         "2. Pulsa **Authorize** e inicia sesión: Swagger guardará el token.\n"
         "3. El mismo token sirve en api-autos (cabecera `Authorization: Bearer <token>`)."
     ),
-    version="1.0.0",
+    # La versión la actualiza release-please en cada release (no editar a mano).
+    version="1.0.0",  # x-release-please-version
     lifespan=lifespan,
 )
 

@@ -52,7 +52,8 @@ app = FastAPI(
         "**Autenticación**: todas las rutas (salvo `/`) requieren un token JWT. "
         "Obténlo en api-usuarios (`POST /auth/login`) y pégalo en el botón *Authorize*."
     ),
-    version="1.0.0",
+    # La versión la actualiza release-please en cada release (no editar a mano).
+    version="1.0.0",  # x-release-please-version
 )
 
 # ---------------------------------------------------------------------------

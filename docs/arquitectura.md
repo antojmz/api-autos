@@ -13,6 +13,9 @@
 ├── docs/                  Toda la documentación
 ├── docker-compose.yml     Orquesta todos los servicios y apps
 ├── .env                   Configuración compartida (JWT_SECRET_KEY). No se versiona.
+├── .github/workflows/     release-please (releases) y pr-title (valida Conventional Commits)
+├── release-please-config.json, .release-please-manifest.json, version.txt
+│                          versión única del monorepo (ver docs/releases.md)
 ├── README.md              Presentación y arranque rápido
 └── CLAUDE.md              Contexto para agentes de IA (hay uno más por servicio)
 ```
