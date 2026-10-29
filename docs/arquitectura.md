@@ -7,11 +7,13 @@
 ├── services/              Backends (APIs, workers). Uno por carpeta.
 │   ├── api-usuarios/      Autenticación (JWT) y CRUD de usuarios
 │   └── api-autos/         CRUD de autos y modelos (rutas protegidas con JWT)
-├── apps/                  Frontends. Uno por carpeta. (Vacío por ahora)
+├── apps/                  Frontends. Uno por carpeta.
+│   └── web/               Nuxt 4 + Vuetify 4, con BFF (cookie httpOnly)
 ├── libs/                  Código compartido entre servicios y/o apps
 │   └── auth-jwt/          Emisión y validación de JWT (paquete Python)
 ├── docs/                  Toda la documentación
 ├── docker-compose.yml     Orquesta todos los servicios y apps
+├── API_Monorepo.postman_collection.json  Pruebas end-to-end de todas las APIs y el BFF
 ├── .env                   Configuración compartida (JWT_SECRET_KEY). No se versiona.
 ├── .github/workflows/     release-please (releases) y pr-title (valida Conventional Commits)
 ├── release-please-config.json, .release-please-manifest.json, version.txt
@@ -21,12 +23,13 @@
 ```
 
 ```
-                ┌─────────────┐  1. login   ┌───────────────────────┐
-   usuario ───► │ apps/<web>  │ ──────────► │ services/api-usuarios │ ── emite JWT
-                │ (futuro)    │ ◄── token ─ │ :8001                 │
-                └──────┬──────┘             └───────────┬───────────┘
-                       │ 2. Authorization: Bearer       │ tabla usuarios
-                       ▼                                │
+  navegador ──► ┌──────────────┐  1. login   ┌───────────────────────┐
+  (cookie       │ apps/web     │ ──────────► │ services/api-usuarios │ ── emite JWT
+   httpOnly)    │ :3000  BFF   │ ◄── token ─ │ :8001                 │
+                └──────┬───────┘             └───────────┬───────────┘
+                       │ 2. Authorization: Bearer        │ tabla usuarios
+                       │    (lo añade el BFF)            │
+                       ▼                                 │
                 ┌──────────────────────┐                │
                 │ services/api-autos   │                │
                 │ :8000  valida el JWT │                │
@@ -39,6 +42,7 @@
                 └─────────────────────────────────────────────────┘
 
    libs/auth-jwt: instalada en las imágenes de ambos servicios.
+   El navegador solo habla con apps/web; el token nunca llega a JavaScript (ver apps/web.md).
 ```
 
 ## Autenticación entre servicios
@@ -89,16 +93,12 @@ Reglas:
 5. Documentarlo en `docs/services/<nombre>.md` y enlazarlo en `docs/README.md`.
 
 ### Una app (frontend)
-1. Crear `apps/<nombre>/` con el framework elegido.
-2. Si va en Docker, añadir su bloque en `docker-compose.yml`.
-3. Añadir su origen (por ejemplo `http://localhost:5173`) a `CORS_ORIGINS` de los servicios que consuma. Por defecto ya se permiten los puertos 3000 y 5173 de localhost.
-4. El flujo de autenticación es:
-   - `POST {api-usuarios}/auth/login` como **formulario**.
-   - Guardar el `access_token` (en memoria, si es posible).
-   - Enviarlo en `Authorization: Bearer` a todos los servicios.
-   - Ante un 401, volver a pedir el login.
-5. Documentarla en `docs/apps/<nombre>.md`.
-6. Si llegan a existir varias apps JavaScript, evaluar en ese momento un gestor de workspaces (pnpm workspaces, Turborepo o Nx).
+1. Crear `apps/<nombre>/` con el framework elegido. Toma `apps/web` como referencia: Dockerfile, `Dockerfile.dockerignore` y BFF.
+2. Si va en Docker, añadir su bloque en `docker-compose.yml` (con `depends_on` de las APIs que consuma).
+3. Autenticación recomendada: **BFF** como en `apps/web`. El servidor de la app hace el login, guarda el token en una cookie `httpOnly` y hace de proxy hacia las APIs. Así no hay CORS y el token nunca llega al JavaScript del navegador.
+   - Si la app llama a las APIs **directamente** desde el navegador, hay que añadir su origen a `CORS_ORIGINS` de cada servicio.
+4. Documentarla en `docs/apps/<nombre>.md`.
+5. Si llegan a existir varias apps JavaScript, evaluar en ese momento un gestor de workspaces (pnpm workspaces, Turborepo o Nx).
 
 ### Una librería compartida
 1. Crear `libs/<nombre>/` con su gestor de paquetes (`pyproject.toml` para Python, `package.json` para JS).
@@ -111,4 +111,5 @@ Reglas:
 |---|---|---|---|---|
 | `services/api-usuarios` | Backend | FastAPI, SQLModel, Alembic, PyJWT, Argon2 | 8001 (`USUARIOS_PORT`) | [services/api-usuarios.md](services/api-usuarios.md) |
 | `services/api-autos` | Backend | FastAPI, SQLModel, Alembic | 8000 (`AUTOS_PORT`) | [services/api-autos.md](services/api-autos.md) |
+| `apps/web` | Frontend | Nuxt 4, Vuetify 4, BFF en Nitro | 3000 (`WEB_PORT`) | [apps/web.md](apps/web.md) |
 | `libs/auth-jwt` | Librería Python | PyJWT, FastAPI | — | [libs/auth-jwt.md](libs/auth-jwt.md) |

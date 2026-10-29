@@ -22,7 +22,8 @@
       "extra-files": [
         { "type": "generic", "path": "services/api-autos/app/main.py" },
         { "type": "generic", "path": "services/api-usuarios/app/main.py" },
-        { "type": "toml", "path": "libs/auth-jwt/pyproject.toml", "jsonpath": "$.project.version" }
+        { "type": "toml", "path": "libs/auth-jwt/pyproject.toml", "jsonpath": "$.project.version" },
+        { "type": "json", "path": "apps/web/package.json", "jsonpath": "$.version" }
       ]
     }
   }

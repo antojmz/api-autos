@@ -1,0 +1,4680 @@
+{
+  "info": {
+    "name": "API Monorepo",
+    "description": "Colección ÚNICA para probar todo el monorepo: api-usuarios, api-autos y el BFF del frontend (apps/web).\n\n1. Levanta todo desde la raíz: `docker compose up -d`\n2. En las variables de la colección pon `adminPassword` = `ADMIN_PASSWORD` de `services/api-usuarios/.env`.\n3. Ejecuta la colección completa (Run collection) o una carpeta. Cada carpeta obtiene sus propios tokens.\n\nPuertos por defecto: usuarios 8001, autos 8000, web 3000 (variables `baseUrlUsuarios`, `baseUrlAutos`, `baseUrlWeb`).\nEn TODAS las respuestas se comprueba que no aparezcan contraseñas ni hashes.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Se ejecuta tras CADA petición: ninguna respuesta puede exponer contraseñas o hashes.",
+          "pm.test(\"La respuesta no contiene contraseñas ni hashes\", function () {",
+          "    const texto = pm.response.text();",
+          "    pm.expect(texto).to.not.include(\"password_hash\");",
+          "    pm.expect(texto).to.not.include(\"$argon2\");",
+          "});"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrlUsuarios",
+      "value": "http://127.0.0.1:8001"
+    },
+    {
+      "key": "baseUrlAutos",
+      "value": "http://127.0.0.1:8000"
+    },
+    {
+      "key": "baseUrlWeb",
+      "value": "http://127.0.0.1:3000"
+    },
+    {
+      "key": "adminUsername",
+      "value": "admin"
+    },
+    {
+      "key": "adminPassword",
+      "value": "",
+      "description": "ADMIN_PASSWORD de services/api-usuarios/.env"
+    },
+    {
+      "key": "runId",
+      "value": ""
+    },
+    {
+      "key": "adminToken",
+      "value": ""
+    },
+    {
+      "key": "adminId",
+      "value": ""
+    },
+    {
+      "key": "userToken",
+      "value": ""
+    },
+    {
+      "key": "userId",
+      "value": ""
+    },
+    {
+      "key": "otroId",
+      "value": ""
+    },
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "autoId",
+      "value": ""
+    },
+    {
+      "key": "modeloId",
+      "value": ""
+    },
+    {
+      "key": "webAutoId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "1. API Usuarios",
+      "description": "Colección para probar api-usuarios: registro, login (JWT), perfil, administración y soft delete.\n\n1. Levanta los servicios desde la raíz del monorepo: `docker compose up -d`\n2. Pon en la variable de colección `adminPassword` el valor de `ADMIN_PASSWORD` de `services/api-usuarios/.env`.\n3. Ejecuta la colección completa con el Collection Runner (las carpetas dependen unas de otras).\n\nCada ejecución usa un sufijo único (`runId`), porque los usuarios eliminados conservan su username y email reservados. Todas las respuestas se comprueban para que nunca incluyan la contraseña ni su hash.",
+      "item": [
+        {
+          "name": "1. Autenticación",
+          "description": "Registro e inicio de sesión (rutas públicas).",
+          "item": [
+            {
+              "name": "Login admin",
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.collectionVariables.set(\"runId\", String(Date.now()).slice(-8));"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 200\", function () { pm.response.to.have.status(200); });",
+                      "const j = pm.response.json();",
+                      "pm.test(\"Devuelve un token bearer\", function () {",
+                      "    pm.expect(j.token_type).to.eql(\"bearer\");",
+                      "    pm.expect(j.access_token.split(\".\")).to.have.lengthOf(3);",
+                      "    pm.expect(j.expires_in).to.be.above(0);",
+                      "});",
+                      "pm.collectionVariables.set(\"adminToken\", j.access_token);"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrlUsuarios}}/auth/login",
+                  "host": [
+                    "{{baseUrlUsuarios}}"
+                  ],
+                  "path": [
+                    "auth",
+                    "login"
+                  ]
+                },
+                "description": "Login con formulario OAuth2 (username + password). Guarda `adminToken`.",
+                "auth": {
+                  "type": "noauth"
+                },
+                "body": {
+                  "mode": "urlencoded",
+                  "urlencoded": [
+                    {
+                      "key": "username",
+                      "value": "{{adminUsername}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "password",
+                      "value": "{{adminPassword}}",
+                      "type": "text"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Admin: mi perfil",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 200\", function () { pm.response.to.have.status(200); });",
+                      "pm.test(\"Rol admin\", function () { pm.expect(pm.response.json().rol).to.eql(\"admin\"); });",
+                      "pm.collectionVariables.set(\"adminId\", pm.response.json().id);"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrlUsuarios}}/usuarios/me",
+                  "host": [
+                    "{{baseUrlUsuarios}}"
+                  ],
+                  "path": [
+                    "usuarios",
+                    "me"
+                  ]
+                },
+                "description": "Perfil del admin. Guarda `adminId`.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{adminToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Registrar usuario",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 201\", function () { pm.response.to.have.status(201); });",
+                      "const j = pm.response.json();",
+                      "pm.collectionVariables.set(\"userId\", j.id);",
+                      "pm.test(\"Rol usuario, activo y datos normalizados\", function () {",
+                      "    pm.expect(j.rol).to.eql(\"usuario\");",
+                      "    pm.expect(j.activo).to.be.true;",
+                      "    pm.expect(j.username).to.eql(\"usuario.\" + pm.collectionVariables.get(\"runId\"));",
+                      "    pm.expect(j.email).to.eql(\"usuario.\" + pm.collectionVariables.get(\"runId\") + \"@example.com\");",
+                      "    pm.expect(j).to.not.have.property(\"password\");",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrlUsuarios}}/auth/registro",
+                  "host": [
+                    "{{baseUrlUsuarios}}"
+                  ],
+                  "path": [
+                    "auth",
+                    "registro"
+                  ]
+                },
+                "description": "Registro público: siempre crea rol `usuario`. Mayúsculas y espacios se normalizan.",
+                "auth": {
+                  "type": "noauth"
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"username\": \"  Usuario.{{runId}} \",\n  \"email\": \"Usuario.{{runId}}@Example.com\",\n  \"nombre_completo\": \"Ana Pérez\",\n  \"password\": \"Clave-Inicial-2026\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Registro duplicado",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 409\", function () { pm.response.to.have.status(409); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrlUsuarios}}/auth/registro",
+                  "host": [
+                    "{{baseUrlUsuarios}}"
+                  ],
+                  "path": [
+                    "auth",
+                    "registro"
+                  ]
+                },
+                "description": "El username ya existe.",
+                "auth": {
+                  "type": "noauth"
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"username\": \"usuario.{{runId}}\",\n  \"email\": \"otro.{{runId}}@example.com\",\n  \"nombre_completo\": \"Ana Pérez\",\n  \"password\": \"Clave-Inicial-2026\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Registro intentando ser admin (mass assignment)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 422\", function () { pm.response.to.have.status(422); });",
+                      "pm.test(\"Errores saneados (sin eco del input)\", function () {",
+                      "    const j = pm.response.json();",
+                      "    pm.expect(j.errores).to.be.an(\"array\").that.is.not.empty;",
+                      "    j.errores.forEach(e => { pm.expect(e).to.have.keys(\"campo\", \"mensaje\"); });",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrlUsuarios}}/auth/registro",
+                  "host": [
+                    "{{baseUrlUsuarios}}"
+                  ],
+                  "path": [
+                    "auth",
+                    "registro"
+                  ]
+                },
+                "description": "No se acepta el campo `rol`.",
+                "auth": {
+                  "type": "noauth"
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"username\": \"hacker.{{runId}}\",\n  \"email\": \"hacker.{{runId}}@example.com\",\n  \"nombre_completo\": \"Hacker\",\n  \"password\": \"Clave-Inicial-2026\",\n  \"rol\": \"admin\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Registro con contraseña débil",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 422\", function () { pm.response.to.have.status(422); });",
+                      "pm.test(\"Errores saneados (sin eco del input)\", function () {",
+                      "    const j = pm.response.json();",
+                      "    pm.expect(j.errores).to.be.an(\"array\").that.is.not.empty;",
+                      "    j.errores.forEach(e => { pm.expect(e).to.have.keys(\"campo\", \"mensaje\"); });",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrlUsuarios}}/auth/registro",
+                  "host": [
+                    "{{baseUrlUsuarios}}"
+                  ],
+                  "path": [
+                    "auth",
+                    "registro"
+                  ]
+                },
+                "description": "Mínimo 10 caracteres, con letras y números.",
+                "auth": {
+                  "type": "noauth"
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"username\": \"debil.{{runId}}\",\n  \"email\": \"debil.{{runId}}@example.com\",\n  \"nombre_completo\": \"Débil\",\n  \"password\": \"abcdefghij\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Registro con email y username inválidos",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 422\", function () { pm.response.to.have.status(422); });",
+                      "pm.test(\"Errores saneados (sin eco del input)\", function () {",
+                      "    const j = pm.response.json();",
+                      "    pm.expect(j.errores).to.be.an(\"array\").that.is.not.empty;",
+                      "    j.errores.forEach(e => { pm.expect(e).to.have.keys(\"campo\", \"mensaje\"); });",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrlUsuarios}}/auth/registro",
+                  "host": [
+                    "{{baseUrlUsuarios}}"
+                  ],
+                  "path": [
+                    "auth",
+                    "registro"
+                  ]
+                },
+                "description": "Email mal formado y username con caracteres no permitidos.",
+                "auth": {
+                  "type": "noauth"
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"username\": \"<script>\",\n  \"email\": \"no-es-un-email\",\n  \"nombre_completo\": \"X\",\n  \"password\": \"Clave-Inicial-2026\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Login usuario (con email)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 200\", function () { pm.response.to.have.status(200); });",
+                      "const j = pm.response.json();",
+                      "pm.test(\"Devuelve un token bearer\", function () {",
+                      "    pm.expect(j.token_type).to.eql(\"bearer\");",
+                      "    pm.expect(j.access_token.split(\".\")).to.have.lengthOf(3);",
+                      "    pm.expect(j.expires_in).to.be.above(0);",
+                      "});",
+                      "pm.collectionVariables.set(\"userToken\", j.access_token);"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrlUsuarios}}/auth/login",
+                  "host": [
+                    "{{baseUrlUsuarios}}"
+                  ],
+                  "path": [
+                    "auth",
+                    "login"
+                  ]
+                },
+                "description": "El campo `username` acepta también el email. Guarda `userToken`.",
+                "auth": {
+                  "type": "noauth"
+                },
+                "body": {
+                  "mode": "urlencoded",
+                  "urlencoded": [
+                    {
+                      "key": "username",
+                      "value": "USUARIO.{{runId}}@example.com",
+                      "type": "text"
+                    },
+                    {
+                      "key": "password",
+                      "value": "Clave-Inicial-2026",
+                      "type": "text"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Login con contraseña incorrecta",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 401\", function () { pm.response.to.have.status(401); });",
+                      "pm.test(\"Mensaje genérico\", function () { pm.expect(pm.response.json().detail).to.eql(\"Credenciales incorrectas\"); });",
+                      "pm.test(\"Cabecera WWW-Authenticate: Bearer\", function () { pm.response.to.have.header(\"WWW-Authenticate\", \"Bearer\"); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrlUsuarios}}/auth/login",
+                  "host": [
+                    "{{baseUrlUsuarios}}"
+                  ],
+                  "path": [
+                    "auth",
+                    "login"
+                  ]
+                },
+                "description": "Credenciales incorrectas.",
+                "auth": {
+                  "type": "noauth"
+                },
+                "body": {
+                  "mode": "urlencoded",
+                  "urlencoded": [
+                    {
+                      "key": "username",
+                      "value": "usuario.{{runId}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "password",
+                      "value": "Incorrecta-2026",
+                      "type": "text"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Login de usuario inexistente",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 401\", function () { pm.response.to.have.status(401); });",
+                      "pm.test(\"Mensaje genérico\", function () { pm.expect(pm.response.json().detail).to.eql(\"Credenciales incorrectas\"); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrlUsuarios}}/auth/login",
+                  "host": [
+                    "{{baseUrlUsuarios}}"
+                  ],
+                  "path": [
+                    "auth",
+                    "login"
+                  ]
+                },
+                "description": "Mismo mensaje que con contraseña incorrecta (no revela si existe).",
+                "auth": {
+                  "type": "noauth"
+                },
+                "body": {
+                  "mode": "urlencoded",
+                  "urlencoded": [
+                    {
+                      "key": "username",
+                      "value": "nadie.{{runId}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "password",
+                      "value": "Clave-Inicial-2026",
+                      "type": "text"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "2. Mi perfil",
+          "description": "Rutas /usuarios/me (cualquier usuario autenticado).",
+          "item": [
+            {
+              "name": "Sin token",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 401\", function () { pm.response.to.have.status(401); });",
+                      "pm.test(\"Cabecera WWW-Authenticate: Bearer\", function () { pm.response.to.have.header(\"WWW-Authenticate\", \"Bearer\"); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrlUsuarios}}/usuarios/me",
+                  "host": [
+                    "{{baseUrlUsuarios}}"
+                  ],
+                  "path": [
+                    "usuarios",
+                    "me"
+                  ]
+                },
+                "description": "Sin cabecera Authorization.",
+                "auth": {
+                  "type": "noauth"
+                }
+              }
+            },
+            {
+              "name": "Token manipulado",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 401\", function () { pm.response.to.have.status(401); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{userToken}}x"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrlUsuarios}}/usuarios/me",
+                  "host": [
+                    "{{baseUrlUsuarios}}"
+                  ],
+                  "path": [
+                    "usuarios",
+                    "me"
+                  ]
+                },
+                "description": "Token con la firma alterada.",
+                "auth": {
+                  "type": "noauth"
+                }
+              }
+            },
+            {
+              "name": "Mi perfil",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 200\", function () { pm.response.to.have.status(200); });",
+                      "pm.test(\"Es el usuario del token\", function () { pm.expect(pm.response.json().id).to.eql(Number(pm.collectionVariables.get(\"userId\"))); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrlUsuarios}}/usuarios/me",
+                  "host": [
+                    "{{baseUrlUsuarios}}"
+                  ],
+                  "path": [
+                    "usuarios",
+                    "me"
+                  ]
+                },
+                "description": "Perfil del usuario autenticado.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{userToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Actualizar mi nombre (PATCH)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 200\", function () { pm.response.to.have.status(200); });",
+                      "pm.test(\"Nombre actualizado\", function () { pm.expect(pm.response.json().nombre_completo).to.eql(\"Ana María Pérez\"); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrlUsuarios}}/usuarios/me",
+                  "host": [
+                    "{{baseUrlUsuarios}}"
+                  ],
+                  "path": [
+                    "usuarios",
+                    "me"
+                  ]
+                },
+                "description": "Actualización parcial.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{userToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"nombre_completo\": \"Ana María Pérez\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Intentar darme rol admin",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 422\", function () { pm.response.to.have.status(422); });",
+                      "pm.test(\"Errores saneados (sin eco del input)\", function () {",
+                      "    const j = pm.response.json();",
+                      "    pm.expect(j.errores).to.be.an(\"array\").that.is.not.empty;",
+                      "    j.errores.forEach(e => { pm.expect(e).to.have.keys(\"campo\", \"mensaje\"); });",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrlUsuarios}}/usuarios/me",
+                  "host": [
+                    "{{baseUrlUsuarios}}"
+                  ],
+                  "path": [
+                    "usuarios",
+                    "me"
+                  ]
+                },
+                "description": "`rol` no está permitido en /me.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{userToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"rol\": \"admin\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Enviar null en PATCH",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 422\", function () { pm.response.to.have.status(422); });",
+                      "pm.test(\"Errores saneados (sin eco del input)\", function () {",
+                      "    const j = pm.response.json();",
+                      "    pm.expect(j.errores).to.be.an(\"array\").that.is.not.empty;",
+                      "    j.errores.forEach(e => { pm.expect(e).to.have.keys(\"campo\", \"mensaje\"); });",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrlUsuarios}}/usuarios/me",
+                  "host": [
+                    "{{baseUrlUsuarios}}"
+                  ],
+                  "path": [
+                    "usuarios",
+                    "me"
+                  ]
+                },
+                "description": "Un campo enviado no puede ser null.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{userToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": null\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Cambiar contraseña con la actual incorrecta",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 400\", function () { pm.response.to.have.status(400); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrlUsuarios}}/usuarios/me/password",
+                  "host": [
+                    "{{baseUrlUsuarios}}"
+                  ],
+                  "path": [
+                    "usuarios",
+                    "me",
+                    "password"
+                  ]
+                },
+                "description": "Se exige la contraseña actual.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{userToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"password_actual\": \"Incorrecta-2026\",\n  \"password_nueva\": \"Clave-Nueva-2026\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Cambiar contraseña",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 204\", function () { pm.response.to.have.status(204); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrlUsuarios}}/usuarios/me/password",
+                  "host": [
+                    "{{baseUrlUsuarios}}"
+                  ],
+                  "path": [
+                    "usuarios",
+                    "me",
+                    "password"
+                  ]
+                },
+                "description": "La nueva se guarda hasheada.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{userToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"password_actual\": \"Clave-Inicial-2026\",\n  \"password_nueva\": \"Clave-Nueva-2026\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Login con la contraseña anterior",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 401\", function () { pm.response.to.have.status(401); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrlUsuarios}}/auth/login",
+                  "host": [
+                    "{{baseUrlUsuarios}}"
+                  ],
+                  "path": [
+                    "auth",
+                    "login"
+                  ]
+                },
+                "description": "La contraseña vieja ya no sirve.",
+                "auth": {
+                  "type": "noauth"
+                },
+                "body": {
+                  "mode": "urlencoded",
+                  "urlencoded": [
+                    {
+                      "key": "username",
+                      "value": "usuario.{{runId}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "password",
+                      "value": "Clave-Inicial-2026",
+                      "type": "text"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Login con la contraseña nueva",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 200\", function () { pm.response.to.have.status(200); });",
+                      "const j = pm.response.json();",
+                      "pm.test(\"Devuelve un token bearer\", function () {",
+                      "    pm.expect(j.token_type).to.eql(\"bearer\");",
+                      "    pm.expect(j.access_token.split(\".\")).to.have.lengthOf(3);",
+                      "    pm.expect(j.expires_in).to.be.above(0);",
+                      "});",
+                      "pm.collectionVariables.set(\"userToken\", j.access_token);"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrlUsuarios}}/auth/login",
+                  "host": [
+                    "{{baseUrlUsuarios}}"
+                  ],
+                  "path": [
+                    "auth",
+                    "login"
+                  ]
+                },
+                "description": "Actualiza `userToken`.",
+                "auth": {
+                  "type": "noauth"
+                },
+                "body": {
+                  "mode": "urlencoded",
+                  "urlencoded": [
+                    {
+                      "key": "username",
+                      "value": "usuario.{{runId}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "password",
+                      "value": "Clave-Nueva-2026",
+                      "type": "text"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "3. Administración",
+          "description": "CRUD de usuarios: solo admin (salvo ver tu propio perfil por ID).",
+          "item": [
+            {
+              "name": "Usuario normal lista usuarios",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 403\", function () { pm.response.to.have.status(403); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrlUsuarios}}/usuarios",
+                  "host": [
+                    "{{baseUrlUsuarios}}"
+                  ],
+                  "path": [
+                    "usuarios"
+                  ]
+                },
+                "description": "Requiere rol admin.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{userToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Usuario normal ve el perfil del admin",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 403\", function () { pm.response.to.have.status(403); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrlUsuarios}}/usuarios/{{adminId}}",
+                  "host": [
+                    "{{baseUrlUsuarios}}"
+                  ],
+                  "path": [
+                    "usuarios",
+                    "{{adminId}}"
+                  ]
+                },
+                "description": "Control de acceso por objeto (BOLA).",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{userToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Usuario normal ve su propio perfil por ID",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 200\", function () { pm.response.to.have.status(200); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrlUsuarios}}/usuarios/{{userId}}",
+                  "host": [
+                    "{{baseUrlUsuarios}}"
+                  ],
+                  "path": [
+                    "usuarios",
+                    "{{userId}}"
+                  ]
+                },
+                "description": "Permitido: es su propio recurso.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{userToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Admin crea usuario",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 201\", function () { pm.response.to.have.status(201); });",
+                      "pm.collectionVariables.set(\"otroId\", pm.response.json().id);"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrlUsuarios}}/usuarios",
+                  "host": [
+                    "{{baseUrlUsuarios}}"
+                  ],
+                  "path": [
+                    "usuarios"
+                  ]
+                },
+                "description": "El admin puede crear usuarios y fijar el rol. Guarda `otroId`.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{adminToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"username\": \"otro.{{runId}}\",\n  \"email\": \"otro.{{runId}}@example.com\",\n  \"nombre_completo\": \"Luis Gómez\",\n  \"password\": \"Clave-Inicial-2026\",\n  \"rol\": \"usuario\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Admin lista y filtra usuarios",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 200\", function () { pm.response.to.have.status(200); });",
+                      "pm.test(\"Encuentra los 2 usuarios de esta ejecución\", function () {",
+                      "    const j = pm.response.json();",
+                      "    pm.expect(j).to.have.keys(\"total\", \"skip\", \"limit\", \"items\");",
+                      "    pm.expect(j.total).to.eql(2);",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrlUsuarios}}/usuarios?q={{runId}}&rol=usuario&skip=0&limit=10",
+                  "host": [
+                    "{{baseUrlUsuarios}}"
+                  ],
+                  "path": [
+                    "usuarios"
+                  ],
+                  "query": [
+                    {
+                      "key": "q",
+                      "value": "{{runId}}"
+                    },
+                    {
+                      "key": "rol",
+                      "value": "usuario"
+                    },
+                    {
+                      "key": "skip",
+                      "value": "0"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "10"
+                    }
+                  ]
+                },
+                "description": "Paginado + filtro `q` (contiene) y `rol`.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{adminToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Admin lista con limit fuera de rango",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 422\", function () { pm.response.to.have.status(422); });",
+                      "pm.test(\"Errores saneados (sin eco del input)\", function () {",
+                      "    const j = pm.response.json();",
+                      "    pm.expect(j.errores).to.be.an(\"array\").that.is.not.empty;",
+                      "    j.errores.forEach(e => { pm.expect(e).to.have.keys(\"campo\", \"mensaje\"); });",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrlUsuarios}}/usuarios?limit=1000",
+                  "host": [
+                    "{{baseUrlUsuarios}}"
+                  ],
+                  "path": [
+                    "usuarios"
+                  ],
+                  "query": [
+                    {
+                      "key": "limit",
+                      "value": "1000"
+                    }
+                  ]
+                },
+                "description": "`limit` máximo 100.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{adminToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Admin obtiene usuario por ID",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 200\", function () { pm.response.to.have.status(200); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrlUsuarios}}/usuarios/{{otroId}}",
+                  "host": [
+                    "{{baseUrlUsuarios}}"
+                  ],
+                  "path": [
+                    "usuarios",
+                    "{{otroId}}"
+                  ]
+                },
+                "description": "Obtener por ID.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{adminToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Admin obtiene usuario inexistente",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 404\", function () { pm.response.to.have.status(404); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrlUsuarios}}/usuarios/999999",
+                  "host": [
+                    "{{baseUrlUsuarios}}"
+                  ],
+                  "path": [
+                    "usuarios",
+                    "999999"
+                  ]
+                },
+                "description": "No existe.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{adminToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Admin cambia rol y contraseña de otro usuario",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 200\", function () { pm.response.to.have.status(200); });",
+                      "pm.test(\"Rol actualizado\", function () { pm.expect(pm.response.json().rol).to.eql(\"admin\"); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrlUsuarios}}/usuarios/{{otroId}}",
+                  "host": [
+                    "{{baseUrlUsuarios}}"
+                  ],
+                  "path": [
+                    "usuarios",
+                    "{{otroId}}"
+                  ]
+                },
+                "description": "La contraseña se vuelve a hashear antes de guardarse.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{adminToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"rol\": \"admin\",\n  \"password\": \"Clave-Admin-Reset-2026\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Login con la contraseña asignada por el admin",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 200\", function () { pm.response.to.have.status(200); });",
+                      "const j = pm.response.json();",
+                      "pm.test(\"Devuelve un token bearer\", function () {",
+                      "    pm.expect(j.token_type).to.eql(\"bearer\");",
+                      "    pm.expect(j.access_token.split(\".\")).to.have.lengthOf(3);",
+                      "    pm.expect(j.expires_in).to.be.above(0);",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrlUsuarios}}/auth/login",
+                  "host": [
+                    "{{baseUrlUsuarios}}"
+                  ],
+                  "path": [
+                    "auth",
+                    "login"
+                  ]
+                },
+                "description": "Comprueba el re-hash.",
+                "auth": {
+                  "type": "noauth"
+                },
+                "body": {
+                  "mode": "urlencoded",
+                  "urlencoded": [
+                    {
+                      "key": "username",
+                      "value": "otro.{{runId}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "password",
+                      "value": "Clave-Admin-Reset-2026",
+                      "type": "text"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Admin intenta quitarse su rol",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 400\", function () { pm.response.to.have.status(400); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrlUsuarios}}/usuarios/{{adminId}}",
+                  "host": [
+                    "{{baseUrlUsuarios}}"
+                  ],
+                  "path": [
+                    "usuarios",
+                    "{{adminId}}"
+                  ]
+                },
+                "description": "Evita quedarse sin administradores.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{adminToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"rol\": \"usuario\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Usuario normal modifica a otro",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 403\", function () { pm.response.to.have.status(403); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrlUsuarios}}/usuarios/{{otroId}}",
+                  "host": [
+                    "{{baseUrlUsuarios}}"
+                  ],
+                  "path": [
+                    "usuarios",
+                    "{{otroId}}"
+                  ]
+                },
+                "description": "Requiere rol admin.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{userToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"nombre_completo\": \"Hackeado\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "4. Soft delete",
+          "description": "Borrado lógico: el usuario queda desactivado y sus datos reservados.",
+          "item": [
+            {
+              "name": "Usuario normal elimina a otro",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 403\", function () { pm.response.to.have.status(403); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrlUsuarios}}/usuarios/{{otroId}}",
+                  "host": [
+                    "{{baseUrlUsuarios}}"
+                  ],
+                  "path": [
+                    "usuarios",
+                    "{{otroId}}"
+                  ]
+                },
+                "description": "Requiere rol admin.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{userToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Admin intenta eliminarse",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 400\", function () { pm.response.to.have.status(400); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrlUsuarios}}/usuarios/{{adminId}}",
+                  "host": [
+                    "{{baseUrlUsuarios}}"
+                  ],
+                  "path": [
+                    "usuarios",
+                    "{{adminId}}"
+                  ]
+                },
+                "description": "No permitido.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{adminToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Admin elimina usuario",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 204\", function () { pm.response.to.have.status(204); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrlUsuarios}}/usuarios/{{userId}}",
+                  "host": [
+                    "{{baseUrlUsuarios}}"
+                  ],
+                  "path": [
+                    "usuarios",
+                    "{{userId}}"
+                  ]
+                },
+                "description": "Soft delete.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{adminToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Token del usuario eliminado",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 401\", function () { pm.response.to.have.status(401); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrlUsuarios}}/usuarios/me",
+                  "host": [
+                    "{{baseUrlUsuarios}}"
+                  ],
+                  "path": [
+                    "usuarios",
+                    "me"
+                  ]
+                },
+                "description": "Su token deja de servir en este servicio.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{userToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Login del usuario eliminado",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 401\", function () { pm.response.to.have.status(401); });",
+                      "pm.test(\"Mensaje genérico\", function () { pm.expect(pm.response.json().detail).to.eql(\"Credenciales incorrectas\"); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrlUsuarios}}/auth/login",
+                  "host": [
+                    "{{baseUrlUsuarios}}"
+                  ],
+                  "path": [
+                    "auth",
+                    "login"
+                  ]
+                },
+                "description": "No puede iniciar sesión.",
+                "auth": {
+                  "type": "noauth"
+                },
+                "body": {
+                  "mode": "urlencoded",
+                  "urlencoded": [
+                    {
+                      "key": "username",
+                      "value": "usuario.{{runId}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "password",
+                      "value": "Clave-Nueva-2026",
+                      "type": "text"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Admin ve el usuario eliminado",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 200\", function () { pm.response.to.have.status(200); });",
+                      "pm.test(\"Marcado como eliminado\", function () {",
+                      "    const j = pm.response.json();",
+                      "    pm.expect(j.activo).to.be.false;",
+                      "    pm.expect(j.eliminado_en).to.not.be.null;",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrlUsuarios}}/usuarios/{{userId}}",
+                  "host": [
+                    "{{baseUrlUsuarios}}"
+                  ],
+                  "path": [
+                    "usuarios",
+                    "{{userId}}"
+                  ]
+                },
+                "description": "La fila se conserva.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{adminToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Eliminar de nuevo",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 404\", function () { pm.response.to.have.status(404); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrlUsuarios}}/usuarios/{{userId}}",
+                  "host": [
+                    "{{baseUrlUsuarios}}"
+                  ],
+                  "path": [
+                    "usuarios",
+                    "{{userId}}"
+                  ]
+                },
+                "description": "Ya estaba eliminado.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{adminToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Registrar con el username eliminado",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 409\", function () { pm.response.to.have.status(409); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrlUsuarios}}/auth/registro",
+                  "host": [
+                    "{{baseUrlUsuarios}}"
+                  ],
+                  "path": [
+                    "auth",
+                    "registro"
+                  ]
+                },
+                "description": "Username y email siguen reservados.",
+                "auth": {
+                  "type": "noauth"
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"username\": \"usuario.{{runId}}\",\n  \"email\": \"nuevo.{{runId}}@example.com\",\n  \"nombre_completo\": \"Ana Pérez\",\n  \"password\": \"Clave-Inicial-2026\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Limpieza: eliminar el otro usuario",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 204\", function () { pm.response.to.have.status(204); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrlUsuarios}}/usuarios/{{otroId}}",
+                  "host": [
+                    "{{baseUrlUsuarios}}"
+                  ],
+                  "path": [
+                    "usuarios",
+                    "{{otroId}}"
+                  ]
+                },
+                "description": "Deja la BD sin usuarios activos de prueba.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{adminToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. API Autos",
+      "description": "Colección para probar api-autos. Todas sus rutas (salvo `/`) requieren un token JWT emitido por api-usuarios.\n\n1. Levanta los servicios desde la raíz del monorepo: `docker compose up -d`\n2. Pon en la variable de colección `adminPassword` el valor de `ADMIN_PASSWORD` de `services/api-usuarios/.env`.\n3. Ejecuta la colección completa con el Collection Runner. La carpeta \"0. Autenticación\" obtiene los tokens.\n\nLas variables `token`, `userToken`, `autoId` y `modeloId` se rellenan solas. Si usas otros puertos, cambia `baseUrl` y `baseUrlUsuarios`.",
+      "item": [
+        {
+          "name": "0. Autenticación",
+          "description": "Obtiene los tokens en api-usuarios: admin (`token`) y un usuario normal (`userToken`).",
+          "item": [
+            {
+              "name": "Login admin (api-usuarios)",
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.collectionVariables.set(\"runId\", String(Date.now()).slice(-8));"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 200\", function () { pm.response.to.have.status(200); });",
+                      "pm.collectionVariables.set(\"token\", pm.response.json().access_token);"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrlUsuarios}}/auth/login",
+                  "host": [
+                    "{{baseUrlUsuarios}}"
+                  ],
+                  "path": [
+                    "auth",
+                    "login"
+                  ]
+                },
+                "description": "Guarda el token del admin en `token`.",
+                "auth": {
+                  "type": "noauth"
+                },
+                "body": {
+                  "mode": "urlencoded",
+                  "urlencoded": [
+                    {
+                      "key": "username",
+                      "value": "{{adminUsername}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "password",
+                      "value": "{{adminPassword}}",
+                      "type": "text"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Registrar usuario normal (api-usuarios)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 201\", function () { pm.response.to.have.status(201); });",
+                      "pm.collectionVariables.set(\"userId\", pm.response.json().id);"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrlUsuarios}}/auth/registro",
+                  "host": [
+                    "{{baseUrlUsuarios}}"
+                  ],
+                  "path": [
+                    "auth",
+                    "registro"
+                  ]
+                },
+                "description": "Usuario sin rol admin, para probar el 403.",
+                "auth": {
+                  "type": "noauth"
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"username\": \"autos.{{runId}}\",\n  \"email\": \"autos.{{runId}}@example.com\",\n  \"nombre_completo\": \"Usuario Autos\",\n  \"password\": \"Clave-Inicial-2026\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Login usuario normal (api-usuarios)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 200\", function () { pm.response.to.have.status(200); });",
+                      "pm.collectionVariables.set(\"userToken\", pm.response.json().access_token);"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrlUsuarios}}/auth/login",
+                  "host": [
+                    "{{baseUrlUsuarios}}"
+                  ],
+                  "path": [
+                    "auth",
+                    "login"
+                  ]
+                },
+                "description": "Guarda su token en `userToken`.",
+                "auth": {
+                  "type": "noauth"
+                },
+                "body": {
+                  "mode": "urlencoded",
+                  "urlencoded": [
+                    {
+                      "key": "username",
+                      "value": "autos.{{runId}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "password",
+                      "value": "Clave-Inicial-2026",
+                      "type": "text"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "1. General",
+          "description": "Comprobar que la API responde.",
+          "item": [
+            {
+              "name": "Bienvenida",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 200\", function () { pm.response.to.have.status(200); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrlAutos}}/",
+                  "host": [
+                    "{{baseUrlAutos}}"
+                  ],
+                  "path": []
+                },
+                "description": "Endpoint raíz con enlace a la documentación.",
+                "auth": {
+                  "type": "noauth"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "2. Autos",
+          "description": "CRUD de autos (flujo correcto).",
+          "item": [
+            {
+              "name": "Crear auto",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 201\", function () { pm.response.to.have.status(201); });",
+                      "const j = pm.response.json();",
+                      "pm.collectionVariables.set(\"autoId\", j.id);",
+                      "pm.test(\"Devuelve id y marca\", function () { pm.expect(j.id).to.be.a(\"number\"); pm.expect(j.marca).to.eql(\"Toyota\"); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrlAutos}}/autos",
+                  "host": [
+                    "{{baseUrlAutos}}"
+                  ],
+                  "path": [
+                    "autos"
+                  ]
+                },
+                "description": "Crea un auto. Guarda su id en la variable `autoId`.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"marca\": \"Toyota\",\n  \"fecha_ingreso\": \"2026-01-10\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Listar autos (paginado)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 200\", function () { pm.response.to.have.status(200); });",
+                      "pm.test(\"Forma de página\", function () { pm.expect(pm.response.json()).to.have.keys(\"total\", \"skip\", \"limit\", \"items\"); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrlAutos}}/autos?skip=0&limit=10",
+                  "host": [
+                    "{{baseUrlAutos}}"
+                  ],
+                  "path": [
+                    "autos"
+                  ],
+                  "query": [
+                    {
+                      "key": "skip",
+                      "value": "0"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "10"
+                    }
+                  ]
+                },
+                "description": "Lista paginada: `skip` (desde) y `limit` (1 a 100)."
+              }
+            },
+            {
+              "name": "Filtrar autos por marca",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 200\", function () { pm.response.to.have.status(200); });",
+                      "pm.test(\"Encuentra el auto creado\", function () {",
+                      "    const ids = pm.response.json().items.map(a => a.id);",
+                      "    pm.expect(ids).to.include(Number(pm.collectionVariables.get(\"autoId\")));",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrlAutos}}/autos?marca=toy",
+                  "host": [
+                    "{{baseUrlAutos}}"
+                  ],
+                  "path": [
+                    "autos"
+                  ],
+                  "query": [
+                    {
+                      "key": "marca",
+                      "value": "toy"
+                    }
+                  ]
+                },
+                "description": "Filtro por marca: contiene, sin distinguir mayúsculas."
+              }
+            },
+            {
+              "name": "Obtener auto por ID",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 200\", function () { pm.response.to.have.status(200); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrlAutos}}/autos/{{autoId}}",
+                  "host": [
+                    "{{baseUrlAutos}}"
+                  ],
+                  "path": [
+                    "autos",
+                    "{{autoId}}"
+                  ]
+                },
+                "description": "Obtiene un auto por su id."
+              }
+            },
+            {
+              "name": "Actualizar auto (PUT)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 200\", function () { pm.response.to.have.status(200); });",
+                      "pm.test(\"Marca actualizada\", function () { pm.expect(pm.response.json().marca).to.eql(\"Toyota Motor\"); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrlAutos}}/autos/{{autoId}}",
+                  "host": [
+                    "{{baseUrlAutos}}"
+                  ],
+                  "path": [
+                    "autos",
+                    "{{autoId}}"
+                  ]
+                },
+                "description": "PUT es reemplazo completo: se envían todos los campos.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"marca\": \"Toyota Motor\",\n  \"fecha_ingreso\": \"2026-01-05\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "3. Modelos",
+          "description": "Modelos asociados a un auto.",
+          "item": [
+            {
+              "name": "Crear modelo",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 201\", function () { pm.response.to.have.status(201); });",
+                      "const j = pm.response.json();",
+                      "pm.collectionVariables.set(\"modeloId\", j.id);",
+                      "pm.test(\"Precio como string decimal exacto\", function () { pm.expect(j.precio).to.eql(\"25990.50\"); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrlAutos}}/modelo",
+                  "host": [
+                    "{{baseUrlAutos}}"
+                  ],
+                  "path": [
+                    "modelo"
+                  ]
+                },
+                "description": "Crea un modelo para el auto `autoId`. Guarda su id en `modeloId`.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"auto_id\": {{autoId}},\n  \"nombre\": \"Corolla\",\n  \"anio\": 2024,\n  \"precio\": 25990.50,\n  \"fecha_ingreso\": \"2026-02-01\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Crear otro modelo (fecha por defecto = hoy)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 201\", function () { pm.response.to.have.status(201); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrlAutos}}/modelo",
+                  "host": [
+                    "{{baseUrlAutos}}"
+                  ],
+                  "path": [
+                    "modelo"
+                  ]
+                },
+                "description": "Sin `fecha_ingreso`: la API usa la fecha de hoy.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"auto_id\": {{autoId}},\n  \"nombre\": \"Yaris\",\n  \"anio\": 2025,\n  \"precio\": 18000\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Listar autos con sus modelos",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 200\", function () { pm.response.to.have.status(200); });",
+                      "pm.test(\"El auto tiene 2 modelos\", function () {",
+                      "    const id = Number(pm.collectionVariables.get(\"autoId\"));",
+                      "    const auto = pm.response.json().items.find(a => a.id === id);",
+                      "    pm.expect(auto.modelos).to.have.lengthOf(2);",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrlAutos}}/modelos/autos?skip=0&limit=10",
+                  "host": [
+                    "{{baseUrlAutos}}"
+                  ],
+                  "path": [
+                    "modelos",
+                    "autos"
+                  ],
+                  "query": [
+                    {
+                      "key": "skip",
+                      "value": "0"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "10"
+                    }
+                  ]
+                },
+                "description": "Autos con sus modelos anidados (paginado)."
+              }
+            },
+            {
+              "name": "Listar modelos (paginado)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 200\", function () { pm.response.to.have.status(200); });",
+                      "pm.test(\"Forma de página\", function () { pm.expect(pm.response.json()).to.have.keys(\"total\", \"skip\", \"limit\", \"items\"); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrlAutos}}/modelos?skip=0&limit=10",
+                  "host": [
+                    "{{baseUrlAutos}}"
+                  ],
+                  "path": [
+                    "modelos"
+                  ],
+                  "query": [
+                    {
+                      "key": "skip",
+                      "value": "0"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "10"
+                    }
+                  ]
+                },
+                "description": "Todos los modelos, paginados."
+              }
+            },
+            {
+              "name": "Listar modelos de un auto",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 200\", function () { pm.response.to.have.status(200); });",
+                      "pm.test(\"Los 2 modelos del auto\", function () {",
+                      "    const j = pm.response.json();",
+                      "    pm.expect(j.total).to.eql(2);",
+                      "    j.items.forEach(m => pm.expect(m.auto_id).to.eql(Number(pm.collectionVariables.get(\"autoId\"))));",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrlAutos}}/modelos?auto_id={{autoId}}",
+                  "host": [
+                    "{{baseUrlAutos}}"
+                  ],
+                  "path": [
+                    "modelos"
+                  ],
+                  "query": [
+                    {
+                      "key": "auto_id",
+                      "value": "{{autoId}}"
+                    }
+                  ]
+                },
+                "description": "Filtro `auto_id`."
+              }
+            },
+            {
+              "name": "Obtener modelo por ID",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 200\", function () { pm.response.to.have.status(200); });",
+                      "pm.test(\"Es el modelo creado\", function () { pm.expect(pm.response.json().nombre).to.eql(\"Corolla\"); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrlAutos}}/modelos/{{modeloId}}",
+                  "host": [
+                    "{{baseUrlAutos}}"
+                  ],
+                  "path": [
+                    "modelos",
+                    "{{modeloId}}"
+                  ]
+                },
+                "description": "Obtiene un modelo."
+              }
+            },
+            {
+              "name": "Actualizar modelo (PUT)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 200\", function () { pm.response.to.have.status(200); });",
+                      "const j = pm.response.json();",
+                      "pm.test(\"Modelo actualizado\", function () {",
+                      "    pm.expect(j.nombre).to.eql(\"Corolla Cross\");",
+                      "    pm.expect(j.precio).to.eql(\"31990.90\");",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrlAutos}}/modelos/{{modeloId}}",
+                  "host": [
+                    "{{baseUrlAutos}}"
+                  ],
+                  "path": [
+                    "modelos",
+                    "{{modeloId}}"
+                  ]
+                },
+                "description": "Reemplazo completo (sin `auto_id`).",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"nombre\": \"Corolla Cross\",\n  \"anio\": 2025,\n  \"precio\": 31990.9,\n  \"fecha_ingreso\": \"2026-02-15\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "4. Validación y seguridad",
+          "description": "Casos de error esperados (OWASP: validación estricta y errores sin detalles internos).",
+          "item": [
+            {
+              "name": "Auto: marca vacía",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 422\", function () { pm.response.to.have.status(422); });",
+                      "pm.test(\"Errores saneados (sin eco del input)\", function () {",
+                      "    const j = pm.response.json();",
+                      "    pm.expect(j.errores).to.be.an(\"array\").that.is.not.empty;",
+                      "    j.errores.forEach(e => { pm.expect(e).to.have.keys(\"campo\", \"mensaje\"); });",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrlAutos}}/autos",
+                  "host": [
+                    "{{baseUrlAutos}}"
+                  ],
+                  "path": [
+                    "autos"
+                  ]
+                },
+                "description": "Espacios se recortan y queda < 2 caracteres.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"marca\": \"  \"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Auto: campo extra (mass assignment)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 422\", function () { pm.response.to.have.status(422); });",
+                      "pm.test(\"Errores saneados (sin eco del input)\", function () {",
+                      "    const j = pm.response.json();",
+                      "    pm.expect(j.errores).to.be.an(\"array\").that.is.not.empty;",
+                      "    j.errores.forEach(e => { pm.expect(e).to.have.keys(\"campo\", \"mensaje\"); });",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrlAutos}}/autos",
+                  "host": [
+                    "{{baseUrlAutos}}"
+                  ],
+                  "path": [
+                    "autos"
+                  ]
+                },
+                "description": "No se permite enviar `id` ni otros campos no declarados.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"marca\": \"Kia\",\n  \"id\": 99\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Auto: caracteres no permitidos (XSS)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 422\", function () { pm.response.to.have.status(422); });",
+                      "pm.test(\"Errores saneados (sin eco del input)\", function () {",
+                      "    const j = pm.response.json();",
+                      "    pm.expect(j.errores).to.be.an(\"array\").that.is.not.empty;",
+                      "    j.errores.forEach(e => { pm.expect(e).to.have.keys(\"campo\", \"mensaje\"); });",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrlAutos}}/autos",
+                  "host": [
+                    "{{baseUrlAutos}}"
+                  ],
+                  "path": [
+                    "autos"
+                  ]
+                },
+                "description": "Solo letras, números y separadores simples.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"marca\": \"<script>alert(1)</script>\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Auto: fecha futura",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 422\", function () { pm.response.to.have.status(422); });",
+                      "pm.test(\"Errores saneados (sin eco del input)\", function () {",
+                      "    const j = pm.response.json();",
+                      "    pm.expect(j.errores).to.be.an(\"array\").that.is.not.empty;",
+                      "    j.errores.forEach(e => { pm.expect(e).to.have.keys(\"campo\", \"mensaje\"); });",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrlAutos}}/autos",
+                  "host": [
+                    "{{baseUrlAutos}}"
+                  ],
+                  "path": [
+                    "autos"
+                  ]
+                },
+                "description": "La fecha de ingreso no puede ser futura.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"marca\": \"Kia\",\n  \"fecha_ingreso\": \"2099-01-01\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Auto: JSON mal formado",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 422\", function () { pm.response.to.have.status(422); });",
+                      "pm.test(\"Errores saneados (sin eco del input)\", function () {",
+                      "    const j = pm.response.json();",
+                      "    pm.expect(j.errores).to.be.an(\"array\").that.is.not.empty;",
+                      "    j.errores.forEach(e => { pm.expect(e).to.have.keys(\"campo\", \"mensaje\"); });",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrlAutos}}/autos",
+                  "host": [
+                    "{{baseUrlAutos}}"
+                  ],
+                  "path": [
+                    "autos"
+                  ]
+                },
+                "description": "Cuerpo que no es JSON válido.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\"marca\": ",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Listar: limit fuera de rango",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 422\", function () { pm.response.to.have.status(422); });",
+                      "pm.test(\"Errores saneados (sin eco del input)\", function () {",
+                      "    const j = pm.response.json();",
+                      "    pm.expect(j.errores).to.be.an(\"array\").that.is.not.empty;",
+                      "    j.errores.forEach(e => { pm.expect(e).to.have.keys(\"campo\", \"mensaje\"); });",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrlAutos}}/autos?limit=1000",
+                  "host": [
+                    "{{baseUrlAutos}}"
+                  ],
+                  "path": [
+                    "autos"
+                  ],
+                  "query": [
+                    {
+                      "key": "limit",
+                      "value": "1000"
+                    }
+                  ]
+                },
+                "description": "`limit` máximo es 100."
+              }
+            },
+            {
+              "name": "Obtener: ID no numérico",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 422\", function () { pm.response.to.have.status(422); });",
+                      "pm.test(\"Errores saneados (sin eco del input)\", function () {",
+                      "    const j = pm.response.json();",
+                      "    pm.expect(j.errores).to.be.an(\"array\").that.is.not.empty;",
+                      "    j.errores.forEach(e => { pm.expect(e).to.have.keys(\"campo\", \"mensaje\"); });",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrlAutos}}/autos/abc",
+                  "host": [
+                    "{{baseUrlAutos}}"
+                  ],
+                  "path": [
+                    "autos",
+                    "abc"
+                  ]
+                },
+                "description": "El id debe ser un entero > 0."
+              }
+            },
+            {
+              "name": "Obtener: ID inexistente",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 404\", function () { pm.response.to.have.status(404); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrlAutos}}/autos/999999",
+                  "host": [
+                    "{{baseUrlAutos}}"
+                  ],
+                  "path": [
+                    "autos",
+                    "999999"
+                  ]
+                },
+                "description": "Recurso que no existe."
+              }
+            },
+            {
+              "name": "Filtro con intento de inyección SQL",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 200\", function () { pm.response.to.have.status(200); });",
+                      "pm.test(\"No devuelve registros\", function () { pm.expect(pm.response.json().items).to.be.empty; });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrlAutos}}/autos?marca=%27%20OR%201%3D1%20--",
+                  "host": [
+                    "{{baseUrlAutos}}"
+                  ],
+                  "path": [
+                    "autos"
+                  ],
+                  "query": [
+                    {
+                      "key": "marca",
+                      "value": "%27%20OR%201%3D1%20--"
+                    }
+                  ]
+                },
+                "description": "El valor se envía como parámetro al motor: se busca como texto literal."
+              }
+            },
+            {
+              "name": "Modelo: auto inexistente",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 404\", function () { pm.response.to.have.status(404); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrlAutos}}/modelo",
+                  "host": [
+                    "{{baseUrlAutos}}"
+                  ],
+                  "path": [
+                    "modelo"
+                  ]
+                },
+                "description": "El `auto_id` debe existir.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"auto_id\": 999999,\n  \"nombre\": \"X\",\n  \"anio\": 2024,\n  \"precio\": 100\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Modelo: año y precio inválidos",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 422\", function () { pm.response.to.have.status(422); });",
+                      "pm.test(\"Errores saneados (sin eco del input)\", function () {",
+                      "    const j = pm.response.json();",
+                      "    pm.expect(j.errores).to.be.an(\"array\").that.is.not.empty;",
+                      "    j.errores.forEach(e => { pm.expect(e).to.have.keys(\"campo\", \"mensaje\"); });",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrlAutos}}/modelo",
+                  "host": [
+                    "{{baseUrlAutos}}"
+                  ],
+                  "path": [
+                    "modelo"
+                  ]
+                },
+                "description": "Año >= 1886 y precio > 0.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"auto_id\": {{autoId}},\n  \"nombre\": \"X\",\n  \"anio\": 1700,\n  \"precio\": -5\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Modelo: precio con 3 decimales",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 422\", function () { pm.response.to.have.status(422); });",
+                      "pm.test(\"Errores saneados (sin eco del input)\", function () {",
+                      "    const j = pm.response.json();",
+                      "    pm.expect(j.errores).to.be.an(\"array\").that.is.not.empty;",
+                      "    j.errores.forEach(e => { pm.expect(e).to.have.keys(\"campo\", \"mensaje\"); });",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrlAutos}}/modelo",
+                  "host": [
+                    "{{baseUrlAutos}}"
+                  ],
+                  "path": [
+                    "modelo"
+                  ]
+                },
+                "description": "Máximo 2 decimales.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"auto_id\": {{autoId}},\n  \"nombre\": \"Yaris\",\n  \"anio\": 2025,\n  \"precio\": 1.234\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Modelo: fecha anterior a la del auto",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 422\", function () { pm.response.to.have.status(422); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrlAutos}}/modelo",
+                  "host": [
+                    "{{baseUrlAutos}}"
+                  ],
+                  "path": [
+                    "modelo"
+                  ]
+                },
+                "description": "Un modelo no puede ingresar antes que su auto.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"auto_id\": {{autoId}},\n  \"nombre\": \"Corolla\",\n  \"anio\": 2024,\n  \"precio\": 25990,\n  \"fecha_ingreso\": \"2025-12-01\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Auto: PUT incompleto",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 422\", function () { pm.response.to.have.status(422); });",
+                      "pm.test(\"Errores saneados (sin eco del input)\", function () {",
+                      "    const j = pm.response.json();",
+                      "    pm.expect(j.errores).to.be.an(\"array\").that.is.not.empty;",
+                      "    j.errores.forEach(e => { pm.expect(e).to.have.keys(\"campo\", \"mensaje\"); });",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrlAutos}}/autos/{{autoId}}",
+                  "host": [
+                    "{{baseUrlAutos}}"
+                  ],
+                  "path": [
+                    "autos",
+                    "{{autoId}}"
+                  ]
+                },
+                "description": "PUT exige todos los campos.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"marca\": \"Toyota\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Auto: PUT con fecha posterior a sus modelos",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 409\", function () { pm.response.to.have.status(409); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrlAutos}}/autos/{{autoId}}",
+                  "host": [
+                    "{{baseUrlAutos}}"
+                  ],
+                  "path": [
+                    "autos",
+                    "{{autoId}}"
+                  ]
+                },
+                "description": "Dejaría modelos con fecha anterior a su auto: conflicto.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"marca\": \"Toyota\",\n  \"fecha_ingreso\": \"2026-03-01\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Modelo: obtener inexistente",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 404\", function () { pm.response.to.have.status(404); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrlAutos}}/modelos/999999",
+                  "host": [
+                    "{{baseUrlAutos}}"
+                  ],
+                  "path": [
+                    "modelos",
+                    "999999"
+                  ]
+                },
+                "description": "No existe."
+              }
+            },
+            {
+              "name": "Modelo: PUT intentando cambiar de auto",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 422\", function () { pm.response.to.have.status(422); });",
+                      "pm.test(\"Errores saneados (sin eco del input)\", function () {",
+                      "    const j = pm.response.json();",
+                      "    pm.expect(j.errores).to.be.an(\"array\").that.is.not.empty;",
+                      "    j.errores.forEach(e => { pm.expect(e).to.have.keys(\"campo\", \"mensaje\"); });",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrlAutos}}/modelos/{{modeloId}}",
+                  "host": [
+                    "{{baseUrlAutos}}"
+                  ],
+                  "path": [
+                    "modelos",
+                    "{{modeloId}}"
+                  ]
+                },
+                "description": "`auto_id` no se acepta en PUT.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"auto_id\": 1,\n  \"nombre\": \"X\",\n  \"anio\": 2024,\n  \"precio\": 100,\n  \"fecha_ingreso\": \"2026-02-15\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Modelo: PUT incompleto",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 422\", function () { pm.response.to.have.status(422); });",
+                      "pm.test(\"Errores saneados (sin eco del input)\", function () {",
+                      "    const j = pm.response.json();",
+                      "    pm.expect(j.errores).to.be.an(\"array\").that.is.not.empty;",
+                      "    j.errores.forEach(e => { pm.expect(e).to.have.keys(\"campo\", \"mensaje\"); });",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrlAutos}}/modelos/{{modeloId}}",
+                  "host": [
+                    "{{baseUrlAutos}}"
+                  ],
+                  "path": [
+                    "modelos",
+                    "{{modeloId}}"
+                  ]
+                },
+                "description": "PUT exige todos los campos.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"nombre\": \"Corolla\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Modelo: PUT con fecha anterior a la del auto",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 422\", function () { pm.response.to.have.status(422); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrlAutos}}/modelos/{{modeloId}}",
+                  "host": [
+                    "{{baseUrlAutos}}"
+                  ],
+                  "path": [
+                    "modelos",
+                    "{{modeloId}}"
+                  ]
+                },
+                "description": "Misma regla que al crear.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"nombre\": \"Corolla\",\n  \"anio\": 2024,\n  \"precio\": 100,\n  \"fecha_ingreso\": \"2025-12-01\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "6. Autenticación y permisos",
+          "description": "Rutas protegidas: 401 sin token o con token inválido; 403 sin rol admin.",
+          "item": [
+            {
+              "name": "Listar autos sin token",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 401\", function () { pm.response.to.have.status(401); });",
+                      "pm.test(\"Cabecera WWW-Authenticate: Bearer\", function () { pm.response.to.have.header(\"WWW-Authenticate\", \"Bearer\"); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrlAutos}}/autos",
+                  "host": [
+                    "{{baseUrlAutos}}"
+                  ],
+                  "path": [
+                    "autos"
+                  ]
+                },
+                "description": "Falta la cabecera Authorization.",
+                "auth": {
+                  "type": "noauth"
+                }
+              }
+            },
+            {
+              "name": "Listar autos con token manipulado",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 401\", function () { pm.response.to.have.status(401); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}x"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrlAutos}}/autos",
+                  "host": [
+                    "{{baseUrlAutos}}"
+                  ],
+                  "path": [
+                    "autos"
+                  ]
+                },
+                "description": "Firma alterada.",
+                "auth": {
+                  "type": "noauth"
+                }
+              }
+            },
+            {
+              "name": "Crear modelo sin token",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 401\", function () { pm.response.to.have.status(401); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrlAutos}}/modelo",
+                  "host": [
+                    "{{baseUrlAutos}}"
+                  ],
+                  "path": [
+                    "modelo"
+                  ]
+                },
+                "description": "También /modelo está protegido.",
+                "auth": {
+                  "type": "noauth"
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"auto_id\": {{autoId}},\n  \"nombre\": \"X\",\n  \"anio\": 2024,\n  \"precio\": 100\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Usuario normal lista autos",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 200\", function () { pm.response.to.have.status(200); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrlAutos}}/autos",
+                  "host": [
+                    "{{baseUrlAutos}}"
+                  ],
+                  "path": [
+                    "autos"
+                  ]
+                },
+                "description": "Cualquier usuario autenticado puede leer.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{userToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Usuario normal elimina un auto",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 403\", function () { pm.response.to.have.status(403); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrlAutos}}/autos/{{autoId}}",
+                  "host": [
+                    "{{baseUrlAutos}}"
+                  ],
+                  "path": [
+                    "autos",
+                    "{{autoId}}"
+                  ]
+                },
+                "description": "Eliminar autos requiere rol admin.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{userToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Usuario normal elimina un modelo",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 403\", function () { pm.response.to.have.status(403); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrlAutos}}/modelos/{{modeloId}}",
+                  "host": [
+                    "{{baseUrlAutos}}"
+                  ],
+                  "path": [
+                    "modelos",
+                    "{{modeloId}}"
+                  ]
+                },
+                "description": "Eliminar modelos requiere rol admin.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{userToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "5. Limpieza",
+          "description": "Elimina el auto creado (y sus modelos en cascada).",
+          "item": [
+            {
+              "name": "Eliminar modelo",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 204\", function () { pm.response.to.have.status(204); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrlAutos}}/modelos/{{modeloId}}",
+                  "host": [
+                    "{{baseUrlAutos}}"
+                  ],
+                  "path": [
+                    "modelos",
+                    "{{modeloId}}"
+                  ]
+                },
+                "description": "El admin elimina un modelo."
+              }
+            },
+            {
+              "name": "Confirmar eliminación del modelo",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 404\", function () { pm.response.to.have.status(404); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrlAutos}}/modelos/{{modeloId}}",
+                  "host": [
+                    "{{baseUrlAutos}}"
+                  ],
+                  "path": [
+                    "modelos",
+                    "{{modeloId}}"
+                  ]
+                },
+                "description": "Ya no existe."
+              }
+            },
+            {
+              "name": "Eliminar auto",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 204\", function () { pm.response.to.have.status(204); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrlAutos}}/autos/{{autoId}}",
+                  "host": [
+                    "{{baseUrlAutos}}"
+                  ],
+                  "path": [
+                    "autos",
+                    "{{autoId}}"
+                  ]
+                },
+                "description": "Borra el auto y sus modelos."
+              }
+            },
+            {
+              "name": "Confirmar eliminación",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 404\", function () { pm.response.to.have.status(404); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrlAutos}}/autos/{{autoId}}",
+                  "host": [
+                    "{{baseUrlAutos}}"
+                  ],
+                  "path": [
+                    "autos",
+                    "{{autoId}}"
+                  ]
+                },
+                "description": "Tras borrar, el auto ya no existe."
+              }
+            },
+            {
+              "name": "Eliminar usuario normal (api-usuarios)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Código HTTP 204\", function () { pm.response.to.have.status(204); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrlUsuarios}}/usuarios/{{userId}}",
+                  "host": [
+                    "{{baseUrlUsuarios}}"
+                  ],
+                  "path": [
+                    "usuarios",
+                    "{{userId}}"
+                  ]
+                },
+                "description": "Soft delete del usuario de prueba."
+              }
+            }
+          ]
+        }
+      ],
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{token}}",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "3. Web (BFF)",
+      "description": "Pruebas del BFF de apps/web (requiere el servicio `web`, puerto 3000). El navegador solo habla con Nuxt; el token JWT viaja en la cookie httpOnly `sesion`, que Postman guarda en su cookie jar.",
+      "item": [
+        {
+          "name": "Salud",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código HTTP 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrlWeb}}/api/salud",
+              "host": [
+                "{{baseUrlWeb}}"
+              ],
+              "path": [
+                "api",
+                "salud"
+              ]
+            },
+            "description": "Usado por el HEALTHCHECK de Docker.",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Proxy sin sesión",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código HTTP 401\", function () { pm.response.to.have.status(401); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrlWeb}}/api/autos/autos",
+              "host": [
+                "{{baseUrlWeb}}"
+              ],
+              "path": [
+                "api",
+                "autos",
+                "autos"
+              ]
+            },
+            "description": "Sin cookie, el BFF no llama a la API.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "Login sin JSON (CSRF)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código HTTP 415\", function () { pm.response.to.have.status(415); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrlWeb}}/api/auth/login",
+              "host": [
+                "{{baseUrlWeb}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Las peticiones que modifican datos deben ser application/json.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "username",
+                  "value": "{{adminUsername}}",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "{{adminPassword}}",
+                  "type": "text"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Login con credenciales incorrectas",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código HTTP 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"Mensaje genérico\", function () { pm.expect(pm.response.json().detail).to.eql(\"Credenciales incorrectas\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrlWeb}}/api/auth/login",
+              "host": [
+                "{{baseUrlWeb}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Mensaje genérico de api-usuarios.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{adminUsername}}\",\n  \"password\": \"Incorrecta-2026\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Login correcto",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "const cookie = pm.response.headers.get(\"Set-Cookie\") || \"\";",
+                  "pm.test(\"Cookie de sesión httpOnly y SameSite=Strict\", function () {",
+                  "    pm.expect(cookie).to.include(\"sesion=\");",
+                  "    pm.expect(cookie).to.include(\"HttpOnly\");",
+                  "    pm.expect(cookie).to.include(\"SameSite=Strict\");",
+                  "});",
+                  "pm.test(\"El token NO aparece en el cuerpo\", function () {",
+                  "    pm.expect(pm.response.text()).to.not.include(\"access_token\");",
+                  "    pm.expect(pm.response.json().username).to.eql(pm.collectionVariables.get(\"adminUsername\"));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrlWeb}}/api/auth/login",
+              "host": [
+                "{{baseUrlWeb}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Guarda el JWT en una cookie httpOnly y devuelve solo el perfil.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{adminUsername}}\",\n  \"password\": \"{{adminPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Sesión actual",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Es admin\", function () { pm.expect(pm.response.json().rol).to.eql(\"admin\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrlWeb}}/api/auth/sesion",
+              "host": [
+                "{{baseUrlWeb}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "sesion"
+              ]
+            },
+            "description": "Perfil del usuario de la cookie.",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Proxy: crear auto",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get(\"runId\")) { pm.collectionVariables.set(\"runId\", String(Date.now()).slice(-8)); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código HTTP 201\", function () { pm.response.to.have.status(201); });",
+                  "pm.collectionVariables.set(\"webAutoId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrlWeb}}/api/autos/autos",
+              "host": [
+                "{{baseUrlWeb}}"
+              ],
+              "path": [
+                "api",
+                "autos",
+                "autos"
+              ]
+            },
+            "description": "El BFF añade Authorization: Bearer con el token de la cookie.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"marca\": \"Web {{runId}}\",\n  \"fecha_ingreso\": \"2026-01-10\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Proxy: listar autos con filtro",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Encuentra el auto creado\", function () {",
+                  "    const ids = pm.response.json().items.map(a => a.id);",
+                  "    pm.expect(ids).to.include(Number(pm.collectionVariables.get(\"webAutoId\")));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrlWeb}}/api/autos/autos?marca=web&limit=10",
+              "host": [
+                "{{baseUrlWeb}}"
+              ],
+              "path": [
+                "api",
+                "autos",
+                "autos"
+              ],
+              "query": [
+                {
+                  "key": "marca",
+                  "value": "web"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Query reenviada a api-autos.",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Proxy: error 422 de la API",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código HTTP 422\", function () { pm.response.to.have.status(422); });",
+                  "pm.test(\"Errores saneados (sin eco del input)\", function () {",
+                  "    const j = pm.response.json();",
+                  "    pm.expect(j.errores).to.be.an(\"array\").that.is.not.empty;",
+                  "    j.errores.forEach(e => { pm.expect(e).to.have.keys(\"campo\", \"mensaje\"); });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrlWeb}}/api/autos/autos",
+              "host": [
+                "{{baseUrlWeb}}"
+              ],
+              "path": [
+                "api",
+                "autos",
+                "autos"
+              ]
+            },
+            "description": "Los errores de validación llegan tal cual.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"marca\": \"<script>\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Proxy: perfil vía api-usuarios",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código HTTP 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrlWeb}}/api/usuarios/usuarios/me",
+              "host": [
+                "{{baseUrlWeb}}"
+              ],
+              "path": [
+                "api",
+                "usuarios",
+                "usuarios",
+                "me"
+              ]
+            },
+            "description": "El proxy también llega a api-usuarios.",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Seguridad: servicio desconocido",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código HTTP 404\", function () { pm.response.to.have.status(404); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrlWeb}}/api/otro/x",
+              "host": [
+                "{{baseUrlWeb}}"
+              ],
+              "path": [
+                "api",
+                "otro",
+                "x"
+              ]
+            },
+            "description": "Lista blanca de servicios.",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Seguridad: login a través del proxy",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código HTTP 404\", function () { pm.response.to.have.status(404); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrlWeb}}/api/usuarios/auth/login",
+              "host": [
+                "{{baseUrlWeb}}"
+              ],
+              "path": [
+                "api",
+                "usuarios",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "El proxy no permite rutas /auth: devolverían el token en JSON.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Seguridad: path traversal codificado",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código HTTP 404\", function () { pm.response.to.have.status(404); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrlWeb}}/api/autos/autos%2F..%2Fx",
+              "host": [
+                "{{baseUrlWeb}}"
+              ],
+              "path": [
+                "api",
+                "autos",
+                "autos%2F..%2Fx"
+              ]
+            },
+            "description": "Cada tramo solo admite [A-Za-z0-9_-].",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Seguridad: DELETE sin Content-Type JSON",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código HTTP 415\", function () { pm.response.to.have.status(415); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrlWeb}}/api/autos/autos/{{webAutoId}}",
+              "host": [
+                "{{baseUrlWeb}}"
+              ],
+              "path": [
+                "api",
+                "autos",
+                "autos",
+                "{{webAutoId}}"
+              ]
+            },
+            "description": "Protección CSRF.",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Proxy: eliminar auto",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código HTTP 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrlWeb}}/api/autos/autos/{{webAutoId}}",
+              "host": [
+                "{{baseUrlWeb}}"
+              ],
+              "path": [
+                "api",
+                "autos",
+                "autos",
+                "{{webAutoId}}"
+              ]
+            },
+            "description": "Limpieza del auto creado.",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Logout",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código HTTP 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrlWeb}}/api/auth/logout",
+              "host": [
+                "{{baseUrlWeb}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "logout"
+              ]
+            },
+            "description": "Borra la cookie.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Sesión tras logout",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código HTTP 401\", function () { pm.response.to.have.status(401); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrlWeb}}/api/auth/sesion",
+              "host": [
+                "{{baseUrlWeb}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "sesion"
+              ]
+            },
+            "description": "Ya no hay sesión.",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
