@@ -1,4 +1,12 @@
+# Credenciales (en cualquier carpeta del monorepo)
 .env
+# Python
 .venv/
 __pycache__/
 *.pyc
+# Node / frontends
+node_modules/
+dist/
+build/
+# Sistema
+.DS_Store
