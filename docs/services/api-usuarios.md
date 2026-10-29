@@ -162,12 +162,14 @@ Para desactivar a alguien de forma temporal, sin eliminarlo, usa `PATCH /usuario
 ## 4. Probar
 
 ### Postman / newman
-1. Importa `services/api-usuarios/postman/API_Usuarios.postman_collection.json`.
+La colección única del monorepo está en la raíz (`API_Monorepo.postman_collection.json`); las pruebas de este servicio están en su carpeta **"1. API Usuarios"**.
+
+1. Importa `API_Monorepo.postman_collection.json`.
 2. En las variables de la colección, pon en `adminPassword` tu `ADMIN_PASSWORD`.
-3. Ejecuta la colección completa. Son 41 peticiones que cubren registro, login, perfil, cambio de contraseña, permisos (401 y 403), administración y soft delete. Además, en **cada** respuesta se comprueba que no aparezcan contraseñas ni hashes.
+3. Ejecuta la carpeta "1. API Usuarios". Son 41 peticiones que cubren registro, login, perfil, cambio de contraseña, permisos (401 y 403), administración y soft delete. Además, en **cada** respuesta se comprueba que no aparezcan contraseñas ni hashes.
 
 ```bash
-npx -y newman run services/api-usuarios/postman/API_Usuarios.postman_collection.json \
+npx -y newman run API_Monorepo.postman_collection.json --folder "1. API Usuarios" \
   --env-var adminPassword=TU_CLAVE_ADMIN
 ```
 
@@ -252,6 +254,5 @@ services/api-usuarios/
 │   ├── dependencies.py              guards: obtener_usuario_actual (401), requiere_admin (403)
 │   ├── routers/auth.py, usuarios.py
 │   └── main.py                      lifespan (admin inicial), CORS, cabeceras, errores
-├── postman/API_Usuarios.postman_collection.json
 └── CLAUDE.md
 ```

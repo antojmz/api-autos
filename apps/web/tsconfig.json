@@ -1,0 +1,11 @@
+{
+  // Nuxt genera la configuración real de TypeScript en .nuxt/ (con los alias
+  // y auto-imports); aquí solo se referencian esos archivos.
+  "files": [],
+  "references": [
+    { "path": "./.nuxt/tsconfig.app.json" },
+    { "path": "./.nuxt/tsconfig.server.json" },
+    { "path": "./.nuxt/tsconfig.shared.json" },
+    { "path": "./.nuxt/tsconfig.node.json" }
+  ]
+}

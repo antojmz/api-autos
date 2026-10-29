@@ -42,13 +42,13 @@ docker compose run --rm -v "$(pwd)/services/api-autos/alembic/versions:/app/alem
 
 # Pruebas end-to-end (con api-usuarios y api-autos levantados)
 PW=$(grep ADMIN_PASSWORD services/api-usuarios/.env | cut -d= -f2-)
-npx -y newman run services/api-autos/postman/API_Autos.postman_collection.json --env-var "adminPassword=$PW" [--env-var baseUrl=http://127.0.0.1:8002]
+npx -y newman run API_Monorepo.postman_collection.json --folder "2. API Autos" --env-var "adminPassword=$PW" [--env-var baseUrlAutos=http://127.0.0.1:8002]
 
 # Vaciar autos y modelos, con los IDs desde 1 (no toca la tabla usuarios)
 docker compose exec api-autos alembic downgrade base && docker compose exec api-autos alembic upgrade head
 ```
 
-No hay tests automatizados en Python. La colección de Postman (`postman/API_Autos.postman_collection.json`, 35 peticiones con asserts) es la suite de verificación: debe pasar completa después de cualquier cambio. Obtiene los tokens en `api-usuarios` (carpeta "0. Autenticación") y necesita la variable `adminPassword`.
+No hay tests automatizados en Python. La suite de verificación es la carpeta "2. API Autos" (46 peticiones con asserts) de la colección única `API_Monorepo.postman_collection.json`, en la raíz del monorepo. Debe pasar completa después de cualquier cambio. Obtiene los tokens en `api-usuarios` (carpeta "0. Autenticación") y necesita la variable `adminPassword`.
 
 ## Arquitectura
 
@@ -58,15 +58,14 @@ app/
 ├── database.py      engine (pool_pre_ping) + get_session() con yield
 ├── models.py        TABLAS SQLModel (table=True): Auto, Modelo
 ├── schemas.py       Esquemas Pydantic de entrada/salida + validadores reutilizables
-├── dependencies.py  SessionDep, PaginacionDep, AutoDep (obtener_auto_o_404)
+├── dependencies.py  SessionDep, PaginacionDep, AutoDep (obtener_auto_o_404), ModeloDep (obtener_modelo_o_404)
 ├── routers/
 │   ├── autos.py     /autos CRUD (+ _escapar_like); router con Depends(obtener_claims); DELETE con requiere_rol(Rol.ADMIN)
-│   └── modelos.py   POST /modelo, GET /modelos/autos; router con Depends(obtener_claims)
+│   └── modelos.py   POST /modelo, GET /modelos, GET /modelos/autos (ANTES de /modelos/{id}), GET/PUT/DELETE /modelos/{id}; DELETE con requiere_rol(Rol.ADMIN)
 └── main.py          FastAPI app, get_config_jwt() al importar, CORS, cabeceras, exception handlers, include_router
 alembic/             env.py: settings.database_url, SQLModel.metadata, include_object (ignora tablas de otros servicios), version_table por defecto
 Dockerfile           multi-stage python:3.13-slim; contexto = raíz; venv /opt/venv con requirements + libs/auth-jwt; usuario appuser; HEALTHCHECK a "/"
 docker/entrypoint.sh si recibe argumentos los ejecuta; si no: migraciones (RUN_MIGRATIONS) + uvicorn 0.0.0.0:8000
-postman/             colección de Postman (suite de verificación end-to-end)
 ../../docker-compose.yml  (raíz) servicio api-autos; hereda x-servicio-python (DB_HOST, JWT_SECRET_KEY); puerto 127.0.0.1:${AUTOS_PORT:-8000}
 Dockerfile.dockerignore   LISTA BLANCA de lo que entra a la imagen (contexto = raíz)
 ```
@@ -82,7 +81,11 @@ Dockerfile.dockerignore   LISTA BLANCA de lo que entra a la imagen (contexto = r
 | PUT | `/autos/{auto_id}` | token | 200 | 401, 404, 409, 422 |
 | DELETE | `/autos/{auto_id}` | token + admin | 204 | 401, 403, 404 |
 | POST | `/modelo` | token | 201 | 401, 404 (auto no existe), 422 |
+| GET | `/modelos?skip&limit&auto_id` | token | 200 | 401, 422 |
 | GET | `/modelos/autos?skip&limit` | token | 200 | 401, 422 |
+| GET | `/modelos/{modelo_id}` | token | 200 | 401, 404, 422 |
+| PUT | `/modelos/{modelo_id}` | token | 200 | 401, 404, 422 (sin `auto_id`; fecha ≥ la del auto) |
+| DELETE | `/modelos/{modelo_id}` | token + admin | 204 | 401, 403, 404 |
 
 Las listas devuelven `Pagina[T]`: `{total, skip, limit, items}`.
 
@@ -100,7 +103,7 @@ Las listas devuelven `Pagina[T]`: `{total, skip, limit, items}`.
 - Los esquemas de entrada heredan de `EntradaEstricta` (`extra="forbid"` para evitar mass assignment, y `str_strip_whitespace`).
 - Los esquemas de salida heredan de `SalidaORM` (`from_attributes=True`). Los endpoints declaran siempre `response_model`.
 - Los objetos ORM se construyen **campo a campo** desde el esquema validado, nunca con `Model(**datos_cliente)` sin filtrar.
-- Reutilizar lo que ya existe: `PATRON_TEXTO_SEGURO` (lista blanca de caracteres para textos), `Marca`, `FechaIngreso` (no futura), `_anio_razonable`, `Pagina[T]`, `SessionDep`, `PaginacionDep`, `AutoDep`.
+- Reutilizar lo que ya existe: `PATRON_TEXTO_SEGURO` (lista blanca de caracteres para textos), `Marca`, `FechaIngreso` (no futura), `_anio_razonable`, `NombreModelo`, `AnioModelo`, `PrecioModelo`, `Pagina[T]`, `SessionDep`, `PaginacionDep`, `AutoDep`, `ModeloDep`. El frontend (`apps/web/app/utils/reglas.ts`) replica estas reglas: si cambias una, actualízala allí también.
 - Los patrones de Pydantic usan el motor regex de Rust, que no admite lookarounds.
 
 **Seguridad (OWASP)**
@@ -134,7 +137,7 @@ Las listas devuelven `Pagina[T]`: `{total, skip, limit, items}`.
 
 **Mantenimiento**
 - Al cambiar cómo se construye o se levanta la aplicación, actualizar `docs/services/api-autos.md` (en la raíz del monorepo).
-- Al añadir o cambiar un endpoint, actualizar `postman/API_Autos.postman_collection.json` con casos de éxito y de error y sus `pm.test`, y actualizar la tabla de este archivo.
+- Al añadir o cambiar un endpoint, actualizar la carpeta "2. API Autos" de `API_Monorepo.postman_collection.json` (raíz) con casos de éxito y de error y sus `pm.test`, y actualizar la tabla de este archivo.
 
 ## Reglas de negocio
 

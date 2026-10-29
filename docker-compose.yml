@@ -6,7 +6,7 @@
 # (por ejemplo ${JWT_SECRET_KEY}).
 #
 #   docker compose build                  # construir todas las imágenes
-#   docker compose up -d                  # levantar todo en segundo plano
+#   docker compose up -d                  # levantar todo en segundo plano (web en :3000)
 #   docker compose up -d api-usuarios     # levantar solo un servicio
 #   docker compose logs -f api-autos      # ver logs de un servicio
 #   docker compose down                   # detener y eliminar los contenedores
@@ -72,3 +72,31 @@ services:
     ports:
       # Puerto del host: 8000 por defecto; se cambia con AUTOS_PORT.
       - "127.0.0.1:${AUTOS_PORT:-8000}:8000"
+
+  # ---------------------------------------------------------------------------
+  # Frontend — apps/web (Nuxt 4 + Vuetify 4)
+  # El navegador solo habla con este servicio. Su servidor (BFF) llama a las
+  # APIs por la red interna de Docker, usando el NOMBRE del servicio como host
+  # (api-autos, api-usuarios) y el puerto INTERNO 8000 de cada contenedor.
+  # ---------------------------------------------------------------------------
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    image: web:latest
+    container_name: web
+    environment:
+      NUXT_API_AUTOS_URL: http://api-autos:8000
+      NUXT_API_USUARIOS_URL: http://api-usuarios:8000
+      # Secure solo funciona con HTTPS; en http://localhost debe ser false.
+      NUXT_COOKIE_SECURE: ${WEB_COOKIE_SECURE:-false}
+    # Arranca cuando las dos APIs están sanas (HEALTHCHECK).
+    depends_on:
+      api-autos:
+        condition: service_healthy
+      api-usuarios:
+        condition: service_healthy
+    ports:
+      # Puerto del host: 3000 por defecto; se cambia con WEB_PORT.
+      - "127.0.0.1:${WEB_PORT:-3000}:3000"
+    restart: unless-stopped

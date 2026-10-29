@@ -186,10 +186,12 @@ docker compose exec api-autos alembic upgrade head
 ## 4. Probar la API
 
 ### Con Postman
-1. *Import* → elige `services/api-autos/postman/API_Autos.postman_collection.json`.
+La colección única del monorepo está en la raíz: `API_Monorepo.postman_collection.json`. Las pruebas de esta API están en su carpeta **"2. API Autos"**.
+
+1. *Import* → elige `API_Monorepo.postman_collection.json`.
 2. En las variables de la colección, pon en `adminPassword` el valor de `ADMIN_PASSWORD` de `services/api-usuarios/.env`.
-3. Si las APIs no están en los puertos 8000 y 8001, cambia `baseUrl` y `baseUrlUsuarios`.
-4. Ejecuta la colección completa con *Run collection*: 35 peticiones con sus tests.
+3. Si las APIs no están en los puertos 8000 y 8001, cambia `baseUrlAutos` y `baseUrlUsuarios`.
+4. Ejecuta la carpeta "2. API Autos" (*Run folder*): 46 peticiones con sus tests.
    - La carpeta "0. Autenticación" obtiene los tokens del admin y de un usuario normal.
    - La carpeta "6. Autenticación y permisos" prueba los 401 y 403.
    - La carpeta "5. Limpieza" borra los datos que crea.
@@ -207,11 +209,11 @@ En Swagger (`/docs`), pulsa **Authorize** y pega el token.
 ### Desde la terminal (newman, requiere Node.js)
 
 ```bash
-npx -y newman run services/api-autos/postman/API_Autos.postman_collection.json \
+npx -y newman run API_Monorepo.postman_collection.json --folder "2. API Autos" \
   --env-var adminPassword=TU_CLAVE_ADMIN
 # Con otro puerto:
-npx -y newman run services/api-autos/postman/API_Autos.postman_collection.json \
-  --env-var adminPassword=TU_CLAVE_ADMIN --env-var baseUrl=http://127.0.0.1:8002
+npx -y newman run API_Monorepo.postman_collection.json --folder "2. API Autos" \
+  --env-var adminPassword=TU_CLAVE_ADMIN --env-var baseUrlAutos=http://127.0.0.1:8002
 ```
 
 ### Endpoints
@@ -225,7 +227,11 @@ npx -y newman run services/api-autos/postman/API_Autos.postman_collection.json \
 | PUT | `/autos/{id}` | token | Reemplazar un auto |
 | DELETE | `/autos/{id}` | token + rol admin | Eliminar un auto y sus modelos |
 | POST | `/modelo` | token | Crear un modelo de un auto |
+| GET | `/modelos?skip=0&limit=10&auto_id=1` | token | Listar modelos (paginado, filtro opcional por auto) |
 | GET | `/modelos/autos` | token | Listar autos con sus modelos |
+| GET | `/modelos/{id}` | token | Obtener un modelo |
+| PUT | `/modelos/{id}` | token | Reemplazar un modelo (todos los campos menos `auto_id`: un modelo no cambia de auto) |
+| DELETE | `/modelos/{id}` | token + rol admin | Eliminar un modelo |
 
 Sin token o con un token no válido o expirado, la API responde **401**. Con un token válido pero sin el rol necesario, responde **403**.
 
@@ -265,6 +271,6 @@ services/api-autos/
 ├── .env.example                    plantilla de configuración
 ├── requirements.txt
 ├── alembic.ini, alembic/           migraciones de la base de datos
-├── app/                            código de la API (ver services/api-autos/CLAUDE.md)
-└── postman/API_Autos.postman_collection.json
+└── app/                            código de la API (ver services/api-autos/CLAUDE.md)
+API_Monorepo.postman_collection.json (raíz) pruebas end-to-end; carpeta "2. API Autos"
 ```

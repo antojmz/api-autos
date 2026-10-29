@@ -132,17 +132,38 @@ class Pagina[T](BaseModel):
 # ---------------------------------------------------------------------------
 # Modelos (de auto)
 # ---------------------------------------------------------------------------
+# Tipos reutilizables de los campos de un modelo: los usan tanto la creación
+# (POST /modelo) como la actualización (PUT /modelos/{id}), así las reglas
+# están escritas una sola vez.
+NombreModelo = Annotated[
+    str, Field(min_length=1, max_length=60, pattern=PATRON_TEXTO_SEGURO, examples=["Corolla"])
+]
+AnioModelo = Annotated[int, Field(ge=ANIO_MINIMO, examples=[2024]), AfterValidator(_anio_razonable)]
+# gt=0: precio estrictamente positivo. max_digits / decimal_places coinciden
+# con la columna NUMERIC(12, 2) para no truncar valores.
+PrecioModelo = Annotated[
+    Decimal, Field(gt=0, le=PRECIO_MAXIMO, max_digits=12, decimal_places=2, examples=[25990.00])
+]
+
+
 class ModeloCreate(EntradaEstricta):
     """Cuerpo de POST /modelo."""
 
     auto_id: int = Field(gt=0, examples=[1])
-    nombre: str = Field(
-        min_length=1, max_length=60, pattern=PATRON_TEXTO_SEGURO, examples=["Corolla"]
-    )
-    anio: Annotated[int, Field(ge=ANIO_MINIMO, examples=[2024]), AfterValidator(_anio_razonable)]
-    # gt=0: precio estrictamente positivo. max_digits / decimal_places
-    # coinciden con la columna NUMERIC(12, 2) para no truncar valores.
-    precio: Decimal = Field(
-        gt=0, le=PRECIO_MAXIMO, max_digits=12, decimal_places=2, examples=[25990.00]
-    )
+    nombre: NombreModelo
+    anio: AnioModelo
+    precio: PrecioModelo
     fecha_ingreso: FechaIngreso = Field(default_factory=date.today)
+
+
+class ModeloUpdate(EntradaEstricta):
+    """
+    Cuerpo de PUT /modelos/{id}. PUT = reemplazo completo: todo es obligatorio.
+    No incluye `auto_id`: un modelo no se puede mover a otro auto (y como
+    extra="forbid", enviarlo devuelve 422).
+    """
+
+    nombre: NombreModelo
+    anio: AnioModelo
+    precio: PrecioModelo
+    fecha_ingreso: FechaIngreso

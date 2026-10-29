@@ -31,6 +31,7 @@ Al hacer una release, la versión se actualiza sola en:
 | `services/api-autos/app/main.py` | `version=` de FastAPI (se ve en `/docs`) |
 | `services/api-usuarios/app/main.py` | `version=` de FastAPI |
 | `libs/auth-jwt/pyproject.toml` | `[project] version` |
+| `apps/web/package.json` | `version` del frontend |
 
 **No edites estas versiones a mano.** Las líneas de `main.py` llevan el comentario `# x-release-please-version`, que es la marca que release-please busca para reemplazarlas.
 
@@ -58,7 +59,7 @@ feat(api-usuarios)!: el login devuelve también un refresh token
 BREAKING CHANGE: la respuesta de /auth/login cambia de formato.
 ```
 
-**Scopes** (opcionales): indican qué parte del monorepo cambia. Son `api-autos`, `api-usuarios`, `auth-jwt`, `docs` y `monorepo`. Además, `main` lo usa el propio release-please en su PR.
+**Scopes** (opcionales): indican qué parte del monorepo cambia. Son `api-autos`, `api-usuarios`, `auth-jwt`, `web`, `docs` y `monorepo`. Además, `main` lo usa el propio release-please en su PR.
 
 Ejemplos:
 

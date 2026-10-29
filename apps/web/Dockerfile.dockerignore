@@ -1,0 +1,12 @@
+# Archivos que se envían a Docker al construir la imagen de web.
+# LISTA BLANCA: se excluye todo y se permite solo el frontend, sin sus
+# carpetas generadas ni secretos.
+*
+!apps/web
+apps/web/node_modules
+apps/web/.nuxt
+apps/web/.output
+apps/web/.data
+apps/web/.env
+apps/web/CLAUDE.md
+apps/web/Dockerfile*

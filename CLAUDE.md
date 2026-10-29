@@ -12,7 +12,7 @@ Monorepo del proyecto Concesionario de Autos. Es un proyecto **educativo**: el c
 services/api-usuarios/  autenticación (registro, login JWT) y CRUD de usuarios; único que emite tokens
 services/api-autos/     CRUD de autos y modelos; todas sus rutas (salvo "/") exigen token
 libs/auth-jwt/          paquete Python auth_jwt: emitir/validar JWT, Rol, guards de FastAPI
-apps/                   frontends, uno por carpeta -> vacío por ahora
+apps/web/               frontend Nuxt 4 + Vuetify 4; BFF (server/) con el JWT en cookie httpOnly; único punto que habla con el navegador
 docs/                   TODA la documentación -> índice en docs/README.md
 docker-compose.yml      orquesta todos los servicios (único, en la raíz)
 .env                    (raíz, no versionado) JWT_SECRET_KEY compartida
@@ -51,14 +51,14 @@ Cada servicio tiene su propio `CLAUDE.md` con sus reglas. **Antes de tocar un se
 **Otras**
 - Las apps consumen los servicios por HTTP y nunca importan su código. Un servicio no importa código de otro servicio. Lo compartido va a `libs/`.
 - Los `.env` nunca se versionan; `.gitignore` de la raíz los cubre en cualquier carpeta.
-- No hay entornos virtuales locales: todo se ejecuta en Docker.
+- No hay entornos virtuales locales de Python: los backends se ejecutan en Docker. `apps/web` sí admite `npm run dev` local (Node 24.15 o superior) para desarrollar con recarga en caliente; en Docker corre como el servicio `web` (:3000).
 - No añadir herramientas de monorepo JS (pnpm workspaces, Turborepo, Nx) hasta que exista al menos una app que las necesite.
 
 ## Commits y releases
 
 - **Conventional Commits obligatorio**: `tipo(scope opcional): descripción en español`.
   - Tipos: `feat`, `fix`, `perf`, `refactor`, `docs`, `test`, `build`, `ci`, `chore` y `revert`.
-  - Scopes: `api-autos`, `api-usuarios`, `auth-jwt`, `docs` y `monorepo`.
+  - Scopes: `api-autos`, `api-usuarios`, `auth-jwt`, `web`, `docs` y `monorepo`.
   - Para un cambio incompatible: `feat!:` o el pie `BREAKING CHANGE:`.
 - release-please calcula la versión a partir de esos mensajes. Usa una **sola versión para todo el repo**, con tags `vX.Y.Z`.
 - **No editar a mano** `version.txt`, `.release-please-manifest.json`, `CHANGELOG.md` ni las líneas marcadas `# x-release-please-version` (`version=` en los `main.py`, y `version` en `libs/auth-jwt/pyproject.toml`).
@@ -69,7 +69,7 @@ Cada servicio tiene su propio `CLAUDE.md` con sus reglas. **Antes de tocar un se
 
 ```bash
 docker compose build                 # todas las imágenes
-docker compose up -d                 # todo (api-usuarios :8001, api-autos :8000)
+docker compose up -d                 # todo (web :3000, api-usuarios :8001, api-autos :8000)
 docker compose up -d --build <svc>   # reconstruir un servicio tras cambiar su código
 docker compose logs -f <svc>
 docker compose exec <svc> alembic check   # no debe proponer cambios
@@ -80,13 +80,24 @@ En esta máquina, el puerto 8000 del host puede estar ocupado por otro proyecto 
 
 ## Verificación
 
-Con los servicios levantados, deben pasar completas las dos colecciones de Postman. La contraseña del admin es `ADMIN_PASSWORD` de `services/api-usuarios/.env`.
+La suite end-to-end es **una sola colección de Postman en la raíz**: `API_Monorepo.postman_collection.json`. Tiene tres carpetas:
+
+| Carpeta | Peticiones |
+|---|---|
+| `1. API Usuarios` | 41 |
+| `2. API Autos` | 46 |
+| `3. Web (BFF)` | 17 |
+
+En total son 104 peticiones y deben pasar todas. Cada carpeta obtiene sus propios tokens, así que también se puede ejecutar sola con `--folder`.
+
+Un test de colección comprueba en **todas** las respuestas que no aparezcan `password_hash` ni `$argon2`.
 
 ```bash
 PW=$(grep ADMIN_PASSWORD services/api-usuarios/.env | cut -d= -f2-)
-npx -y newman run services/api-usuarios/postman/API_Usuarios.postman_collection.json --env-var "adminPassword=$PW"
-npx -y newman run services/api-autos/postman/API_Autos.postman_collection.json --env-var "adminPassword=$PW" \
-  [--env-var baseUrl=http://127.0.0.1:8002]
+npx -y newman run API_Monorepo.postman_collection.json --env-var "adminPassword=$PW" \
+  [--env-var baseUrlAutos=http://127.0.0.1:8002] [--folder "2. API Autos"]
 ```
 
-`api-usuarios` tiene 41 peticiones y `api-autos` 35.
+Al añadir o cambiar un endpoint (en cualquier servicio o en el BFF), actualiza la carpeta correspondiente de esta colección con casos de éxito y de error.
+
+Frontend: `cd apps/web && npm run typecheck && npm run build` debe pasar sin errores (ver `apps/web/CLAUDE.md`).

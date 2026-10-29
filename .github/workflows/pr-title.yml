@@ -43,6 +43,7 @@ jobs:
             api-autos
             api-usuarios
             auth-jwt
+            web
             docs
             monorepo
             main

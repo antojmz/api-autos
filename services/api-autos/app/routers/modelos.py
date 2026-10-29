@@ -1,19 +1,29 @@
 """
 routers/modelos.py — Modelos de cada auto.
 
-Este router no usa `prefix` porque las rutas pedidas tienen formas distintas:
-  - POST /modelo         -> crear un modelo para un auto existente
-  - GET  /modelos/autos  -> listar autos con sus modelos anidados
+Este router no usa `prefix` porque las rutas tienen formas distintas:
+  - POST   /modelo          -> crear un modelo para un auto existente
+  - GET    /modelos         -> listar modelos (paginado, filtro por auto)
+  - GET    /modelos/autos   -> listar autos con sus modelos anidados
+  - GET    /modelos/{id}    -> obtener un modelo
+  - PUT    /modelos/{id}    -> reemplazar un modelo
+  - DELETE /modelos/{id}    -> eliminar un modelo (solo admin)
+
+IMPORTANTE: "/modelos/autos" se declara ANTES que "/modelos/{modelo_id}".
+FastAPI prueba las rutas en orden; si "/modelos/{modelo_id}" fuera primero,
+"autos" se intentaría convertir a entero y la petición fallaría con 422.
 """
 
-from auth_jwt import obtener_claims
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import Annotated
+
+from auth_jwt import Rol, obtener_claims, requiere_rol
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import selectinload
 from sqlmodel import col, func, select
 
-from app.dependencies import PaginacionDep, SessionDep
+from app.dependencies import ModeloDep, PaginacionDep, SessionDep
 from app.models import Auto, Modelo
-from app.schemas import AutoConModelos, ModeloCreate, ModeloPublic, Pagina
+from app.schemas import AutoConModelos, ModeloCreate, ModeloPublic, ModeloUpdate, Pagina
 
 # Todas las rutas exigen un token JWT válido (ver routers/autos.py).
 router = APIRouter(
@@ -87,3 +97,80 @@ def listar_autos_con_modelos(
         limit=paginacion.limit,
         items=[AutoConModelos.model_validate(auto) for auto in autos],
     )
+
+
+@router.get(
+    "/modelos",
+    response_model=Pagina[ModeloPublic],
+    summary="Listar modelos (paginado, filtro opcional por auto)",
+)
+def listar_modelos(
+    session: SessionDep,
+    paginacion: PaginacionDep,
+    auto_id: Annotated[int | None, Query(gt=0, description="Solo los modelos de este auto")] = None,
+) -> Pagina[ModeloPublic]:
+    consulta = select(Modelo)
+    if auto_id is not None:
+        consulta = consulta.where(Modelo.auto_id == auto_id)
+
+    total = session.exec(select(func.count()).select_from(consulta.subquery())).one()
+    modelos = session.exec(
+        consulta.order_by(col(Modelo.id)).offset(paginacion.skip).limit(paginacion.limit)
+    ).all()
+    return Pagina[ModeloPublic](
+        total=total,
+        skip=paginacion.skip,
+        limit=paginacion.limit,
+        items=[ModeloPublic.model_validate(m) for m in modelos],
+    )
+
+
+@router.get(
+    "/modelos/{modelo_id}",
+    response_model=ModeloPublic,
+    summary="Obtener un modelo por ID",
+    responses={404: {"description": "No existe"}},
+)
+def obtener_modelo(modelo: ModeloDep) -> Modelo:
+    # Igual que en autos: la dependencia valida el ID y devuelve 404 si no existe.
+    return modelo
+
+
+@router.put(
+    "/modelos/{modelo_id}",
+    response_model=ModeloPublic,
+    summary="Actualizar un modelo (reemplazo completo)",
+    responses={404: {"description": "No existe"}},
+)
+def actualizar_modelo(datos: ModeloUpdate, modelo: ModeloDep, session: SessionDep) -> Modelo:
+    # Misma regla de negocio que al crear: el modelo no puede haber ingresado
+    # antes que su auto.
+    auto = session.get(Auto, modelo.auto_id)
+    if auto is not None and datos.fecha_ingreso < auto.fecha_ingreso:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="La fecha de ingreso del modelo no puede ser anterior a la del auto",
+        )
+
+    # Campo a campo desde el esquema validado (nunca setattr con datos sin filtrar).
+    modelo.nombre = datos.nombre
+    modelo.anio = datos.anio
+    modelo.precio = datos.precio
+    modelo.fecha_ingreso = datos.fecha_ingreso
+    session.add(modelo)
+    session.commit()
+    session.refresh(modelo)
+    return modelo
+
+
+@router.delete(
+    "/modelos/{modelo_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Eliminar un modelo — solo admin",
+    # Igual que eliminar un auto: además del token, exige rol admin (403 si no).
+    dependencies=[Depends(requiere_rol(Rol.ADMIN))],
+    responses={403: {"description": "Requiere rol admin"}, 404: {"description": "No existe"}},
+)
+def eliminar_modelo(modelo: ModeloDep, session: SessionDep) -> None:
+    session.delete(modelo)
+    session.commit()

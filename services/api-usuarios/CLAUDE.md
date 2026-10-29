@@ -28,10 +28,10 @@ docker compose run --rm -v "$(pwd)/services/api-usuarios/alembic/versions:/app/a
   api-usuarios alembic revision --autogenerate --rev-id 0002 -m "descripcion"
 # Pruebas end-to-end
 PW=$(grep ADMIN_PASSWORD services/api-usuarios/.env | cut -d= -f2-)
-npx -y newman run services/api-usuarios/postman/API_Usuarios.postman_collection.json --env-var "adminPassword=$PW"
+npx -y newman run API_Monorepo.postman_collection.json --folder "1. API Usuarios" --env-var "adminPassword=$PW"
 ```
 
-La colección de Postman (41 peticiones) es la suite de verificación y debe pasar completa. Un test de colección comprueba, en **todas** las respuestas, que no aparezcan `password_hash` ni `$argon2`. Cada ejecución usa un `runId` único, porque los usuarios eliminados dejan reservados su username y su email.
+La carpeta "1. API Usuarios" (41 peticiones) de la colección única `API_Monorepo.postman_collection.json` (raíz) es la suite de verificación y debe pasar completa. Un test de colección comprueba, en **todas** las respuestas, que no aparezcan `password_hash` ni `$argon2`. Cada ejecución usa un `runId` único, porque los usuarios eliminados dejan reservados su username y su email.
 
 ## Arquitectura
 
@@ -49,7 +49,6 @@ app/
 └── main.py          get_config_jwt() al importar; lifespan -> crear_admin_inicial(); CORS (+PATCH, Authorization); cabeceras (+Cache-Control: no-store); manejadores de errores
 alembic/             env.py: version_table="alembic_version_usuarios" + include_object (ignora autos/modelos)
 Dockerfile, Dockerfile.dockerignore (lista blanca, contexto = raíz), docker/entrypoint.sh
-postman/API_Usuarios.postman_collection.json
 ```
 
 ## Endpoints
@@ -111,7 +110,7 @@ postman/API_Usuarios.postman_collection.json
 - Para cambiar claims, algoritmo o expiración, se modifica `libs/auth-jwt` y se reconstruyen **todos** los servicios.
 
 **Mantenimiento**
-- Al cambiar un endpoint, actualizar la colección de Postman, la tabla de arriba y `docs/services/api-usuarios.md`.
+- Al cambiar un endpoint, actualizar la carpeta "1. API Usuarios" de `API_Monorepo.postman_collection.json` (raíz), la tabla de arriba y `docs/services/api-usuarios.md`.
 
 ## Notas
 
