@@ -8,15 +8,15 @@
       "package-name": "api-autos-monorepo",
       "changelog-path": "CHANGELOG.md",
       "changelog-sections": [
-        { "type": "feat", "section": "Funcionalidades" },
-        { "type": "fix", "section": "Correcciones" },
-        { "type": "perf", "section": "Rendimiento" },
+        { "type": "feat", "section": "Nuevas Funcionalidades" },
+        { "type": "fix", "section": "Correcciones de Errores" },
+        { "type": "perf", "section": "Mejoras de Rendimiento" },
         { "type": "revert", "section": "Reversiones" },
         { "type": "docs", "section": "Documentación" },
         { "type": "refactor", "section": "Refactorización" },
         { "type": "test", "section": "Pruebas", "hidden": true },
         { "type": "build", "section": "Build", "hidden": true },
-        { "type": "ci", "section": "CI", "hidden": true },
+        { "type": "ci", "section": "CI/CD", "hidden": true },
         { "type": "chore", "section": "Mantenimiento", "hidden": true }
       ],
       "extra-files": [
