@@ -6,7 +6,8 @@ Este router no usa `prefix` porque las rutas pedidas tienen formas distintas:
   - GET  /modelos/autos  -> listar autos con sus modelos anidados
 """
 
-from fastapi import APIRouter, HTTPException, status
+from auth_jwt import obtener_claims
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import selectinload
 from sqlmodel import col, func, select
 
@@ -14,7 +15,12 @@ from app.dependencies import PaginacionDep, SessionDep
 from app.models import Auto, Modelo
 from app.schemas import AutoConModelos, ModeloCreate, ModeloPublic, Pagina
 
-router = APIRouter(tags=["Modelos"])
+# Todas las rutas exigen un token JWT válido (ver routers/autos.py).
+router = APIRouter(
+    tags=["Modelos"],
+    dependencies=[Depends(obtener_claims)],
+    responses={401: {"description": "Falta el token o no es válido"}},
+)
 
 
 @router.post(

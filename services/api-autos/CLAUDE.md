@@ -4,7 +4,7 @@ Contexto para agentes que programen en el backend. Las reglas generales del mono
 
 ## Qué es
 
-API REST **educativa** (demo) en FastAPI para un concesionario: CRUD de **Autos** y sus **Modelos**, persistida en PostgreSQL. Es pública y **sin autenticación** a propósito.
+API REST **educativa** (demo) en FastAPI para un concesionario: CRUD de **Autos** y sus **Modelos**, persistida en PostgreSQL. **Todas las rutas, salvo `GET /`, exigen un token JWT** emitido por `services/api-usuarios`. Este servicio solo valida el token con `libs/auth-jwt` (sin consultar usuarios) y no tiene tabla de usuarios.
 
 Es material didáctico: el código está **muy comentado en español**, explicando los conceptos de FastAPI (decoradores, Pydantic, `Depends`, etc.) y los motivos de seguridad (OWASP). Todo código nuevo debe mantener esa misma densidad y estilo de comentarios, en español.
 
@@ -15,7 +15,8 @@ Es material didáctico: el código está **muy comentado en español**, explican
 - SQLModel 0.0.48 (sobre SQLAlchemy 2.1) y psycopg 3 (`postgresql+psycopg`)
 - Alembic 1.20 para migraciones
 - pydantic-settings para leer `.env`
-- PostgreSQL 15 local: base `autos` en `localhost:5432`
+- PostgreSQL 15 local: base `autos` en `localhost:5432`, compartida con `api-usuarios` (este servicio solo gestiona `autos` y `modelos`)
+- `auth-jwt` (librería del monorepo, `libs/auth-jwt`) para validar los tokens
 
 ## Comandos
 
@@ -29,7 +30,7 @@ docker compose up -d api-autos                # arranca: alembic upgrade head + 
 docker compose up -d --build api-autos        # OBLIGATORIO tras cambiar código o requirements.txt
 docker compose logs -f api-autos
 docker compose down
-API_PORT=8001 docker compose up -d api-autos  # si el 8000 del host está ocupado
+AUTOS_PORT=8002 docker compose up -d api-autos  # si el 8000 del host está ocupado
 # Docs: http://127.0.0.1:8000/docs  |  /redoc
 
 # Migraciones (dentro del contenedor)
@@ -39,14 +40,15 @@ docker compose build api-autos
 docker compose run --rm -v "$(pwd)/services/api-autos/alembic/versions:/app/alembic/versions" \
   api-autos alembic revision --autogenerate --rev-id 0002 -m "descripcion"
 
-# Pruebas end-to-end (con la API levantada)
-npx -y newman run services/api-autos/postman/API_Autos.postman_collection.json [--env-var baseUrl=http://127.0.0.1:8001]
+# Pruebas end-to-end (con api-usuarios y api-autos levantados)
+PW=$(grep ADMIN_PASSWORD services/api-usuarios/.env | cut -d= -f2-)
+npx -y newman run services/api-autos/postman/API_Autos.postman_collection.json --env-var "adminPassword=$PW" [--env-var baseUrl=http://127.0.0.1:8002]
 
-# Dejar la BD vacía y con los IDs desde 1
+# Vaciar autos y modelos, con los IDs desde 1 (no toca la tabla usuarios)
 docker compose exec api-autos alembic downgrade base && docker compose exec api-autos alembic upgrade head
 ```
 
-No hay tests automatizados en Python. La colección de Postman (`postman/API_Autos.postman_collection.json`, 26 peticiones con asserts) es la suite de verificación: debe pasar completa después de cualquier cambio.
+No hay tests automatizados en Python. La colección de Postman (`postman/API_Autos.postman_collection.json`, 35 peticiones con asserts) es la suite de verificación: debe pasar completa después de cualquier cambio. Obtiene los tokens en `api-usuarios` (carpeta "0. Autenticación") y necesita la variable `adminPassword`.
 
 ## Arquitectura
 
@@ -58,29 +60,29 @@ app/
 ├── schemas.py       Esquemas Pydantic de entrada/salida + validadores reutilizables
 ├── dependencies.py  SessionDep, PaginacionDep, AutoDep (obtener_auto_o_404)
 ├── routers/
-│   ├── autos.py     /autos CRUD (+ _escapar_like)
-│   └── modelos.py   POST /modelo, GET /modelos/autos
-└── main.py          FastAPI app, CORS, cabeceras de seguridad, exception handlers, include_router
-alembic/             env.py usa settings.database_url y SQLModel.metadata; versions/0001_...
-Dockerfile           multi-stage python:3.13-slim; venv en /opt/venv; usuario appuser; HEALTHCHECK a "/"
+│   ├── autos.py     /autos CRUD (+ _escapar_like); router con Depends(obtener_claims); DELETE con requiere_rol(Rol.ADMIN)
+│   └── modelos.py   POST /modelo, GET /modelos/autos; router con Depends(obtener_claims)
+└── main.py          FastAPI app, get_config_jwt() al importar, CORS, cabeceras, exception handlers, include_router
+alembic/             env.py: settings.database_url, SQLModel.metadata, include_object (ignora tablas de otros servicios), version_table por defecto
+Dockerfile           multi-stage python:3.13-slim; contexto = raíz; venv /opt/venv con requirements + libs/auth-jwt; usuario appuser; HEALTHCHECK a "/"
 docker/entrypoint.sh si recibe argumentos los ejecuta; si no: migraciones (RUN_MIGRATIONS) + uvicorn 0.0.0.0:8000
 postman/             colección de Postman (suite de verificación end-to-end)
-../../docker-compose.yml  (raíz) servicio api-autos; env_file services/api-autos/.env; DB_HOST=host.docker.internal; puerto 127.0.0.1:${API_PORT:-8000}
-.dockerignore        excluye .env, .venv, postman/ y CLAUDE.md de la imagen
+../../docker-compose.yml  (raíz) servicio api-autos; hereda x-servicio-python (DB_HOST, JWT_SECRET_KEY); puerto 127.0.0.1:${AUTOS_PORT:-8000}
+Dockerfile.dockerignore   LISTA BLANCA de lo que entra a la imagen (contexto = raíz)
 ```
 
 ## Endpoints
 
-| Método | Ruta | Éxito | Errores |
-|---|---|---|---|
-| GET | `/` | 200 | |
-| POST | `/autos` | 201 | 422 |
-| GET | `/autos?skip&limit&marca` | 200 | 422 (`limit` > 100) |
-| GET | `/autos/{auto_id}` | 200 | 404, 422 |
-| PUT | `/autos/{auto_id}` | 200 | 404, 409, 422 |
-| DELETE | `/autos/{auto_id}` | 204 | 404 |
-| POST | `/modelo` | 201 | 404 (auto no existe), 422 |
-| GET | `/modelos/autos?skip&limit` | 200 | 422 |
+| Método | Ruta | Acceso | Éxito | Errores |
+|---|---|---|---|---|
+| GET | `/` | público (HEALTHCHECK) | 200 | |
+| POST | `/autos` | token | 201 | 401, 422 |
+| GET | `/autos?skip&limit&marca` | token | 200 | 401, 422 (`limit` > 100) |
+| GET | `/autos/{auto_id}` | token | 200 | 401, 404, 422 |
+| PUT | `/autos/{auto_id}` | token | 200 | 401, 404, 409, 422 |
+| DELETE | `/autos/{auto_id}` | token + admin | 204 | 401, 403, 404 |
+| POST | `/modelo` | token | 201 | 401, 404 (auto no existe), 422 |
+| GET | `/modelos/autos?skip&limit` | token | 200 | 401, 422 |
 
 Las listas devuelven `Pagina[T]`: `{total, skip, limit, items}`.
 
@@ -113,10 +115,20 @@ Las listas devuelven `Pagina[T]`: `{total, skip, limit, items}`.
 - CORS solo con orígenes explícitos (`settings.cors_origins`), `allow_credentials=False` y métodos limitados. Si se añade un método HTTP, añadirlo también en `allow_methods`.
 - Las credenciales van solo en `.env`, que está en `.gitignore`. Mantener `.env.example` actualizado y sin secretos. No escribir la URL de la BD en `alembic.ini`.
 
+**Autenticación**
+- Todo router nuevo se declara con `dependencies=[Depends(obtener_claims)]`. Las operaciones de admin añaden `Depends(requiere_rol(Rol.ADMIN))`. Si un endpoint necesita saber quién llama, recibe `claims: ClaimsDep` (`claims.usuario_id`, `claims.rol`).
+- `GET /` debe seguir siendo público: lo usa el `HEALTHCHECK`.
+- No validar tokens a mano ni duplicar la configuración JWT: usar siempre `auth_jwt`.
+- Este servicio no consulta la tabla `usuarios`. Un usuario desactivado conserva acceso hasta que expira su token; es una limitación documentada.
+
+**Base de datos compartida**
+- La BD `autos` también contiene la tabla `usuarios`, que pertenece a `api-usuarios`. Nunca la leas ni la migres desde aquí.
+- `alembic/env.py` tiene `include_object` para ignorarla; no lo quites.
+
 **Docker**
 - `.env` nunca entra a la imagen: se pasa en tiempo de ejecución con `env_file`.
 - El contenedor corre como el usuario no root `appuser`.
-- Si se añade un archivo o carpeta que la app necesita en tiempo de ejecución, añadir su `COPY` en el `Dockerfile`.
+- Si se añade un archivo o carpeta que la app necesita en tiempo de ejecución, añadir su `COPY services/api-autos/...` en el `Dockerfile` y permitirlo en `Dockerfile.dockerignore`.
 - Las dependencias nuevas van en `requirements.txt` y después se reconstruye la imagen.
 - La configuración nueva se añade a `Settings` en `app/config.py` y a `.env.example`. Si el valor tiene que ser distinto dentro del contenedor, se pone también en `environment` del servicio `api-autos` en el `docker-compose.yml` de la raíz.
 

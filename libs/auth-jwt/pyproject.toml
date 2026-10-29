@@ -1,0 +1,19 @@
+# Librería compartida de autenticación JWT del monorepo.
+# Se instala en los servicios con: pip install ./libs/auth-jwt
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "auth-jwt"
+version = "1.0.0"
+description = "Emisión y validación de JWT compartida por los servicios del monorepo"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.162.0",
+    "pydantic-settings>=2.16.2",
+    "pyjwt>=2.10.1",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
