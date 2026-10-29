@@ -51,7 +51,7 @@ Cada servicio tiene su propio `CLAUDE.md` con sus reglas. **Antes de tocar un se
 **Otras**
 - Las apps consumen los servicios por HTTP y nunca importan su código. Un servicio no importa código de otro servicio. Lo compartido va a `libs/`.
 - Los `.env` nunca se versionan; `.gitignore` de la raíz los cubre en cualquier carpeta.
-- No hay entornos virtuales locales de Python: los backends se ejecutan en Docker. `apps/web` sí admite `npm run dev` local (Node 24.15 o superior) para desarrollar con recarga en caliente; en Docker corre como el servicio `web` (:3000).
+- No hay entornos virtuales locales de Python: todo se ejecuta en Docker. Para desarrollar, `just dev` (recarga en caliente de las APIs y del front, sin Node ni Python locales). `npm run dev` local en `apps/web` también funciona, pero requiere Node 24.15 o superior.
 - No añadir herramientas de monorepo JS (pnpm workspaces, Turborepo, Nx) hasta que exista al menos una app que las necesite.
 
 ## Commits y releases
@@ -67,6 +67,26 @@ Cada servicio tiene su propio `CLAUDE.md` con sus reglas. **Antes de tocar un se
 
 ## Comandos (desde la raíz)
 
+**Para desarrollar, usa `just`** (`justfile` en la raíz; `just` lista las tareas):
+
+```bash
+just setup                           # crea los .env que falten
+just dev                             # TODO en modo desarrollo: código montado + recarga en caliente
+just dev-d / just down / just ps / just logs <svc>
+just migrate [svc]                   # aplicar migraciones (no requiere reiniciar)
+just migration <svc> <rev> "<msg>"   # autogenerar migración (usa el código montado)
+just test ["carpeta"]                # colección de Postman
+just typecheck                       # tipos del frontend (dentro de web-dev)
+just up                              # modo producción
+```
+
+Modo desarrollo = `docker-compose.yml` + `docker-compose.dev.yml`:
+- **APIs**: montan `app/`, `alembic/` y `libs/auth-jwt/src` en solo lectura, con uvicorn `--reload` (`UVICORN_RELOAD=true` en el entrypoint) y `WATCHFILES_FORCE_POLLING`.
+- **Frontend**: corre en `web-dev` (`node:24-slim`, `nuxt dev`, `node_modules` en un volumen propio) en lugar de `web`, que pasa al perfil `produccion`.
+- **Cuándo reiniciar `just dev`**: si cambias dependencias, un Dockerfile, un entrypoint o los archivos de Compose.
+
+Docker Compose directo (producción):
+
 ```bash
 docker compose build                 # todas las imágenes
 docker compose up -d                 # todo (web :3000, api-usuarios :8001, api-autos :8000)
@@ -76,7 +96,7 @@ docker compose exec <svc> alembic check   # no debe proponer cambios
 docker compose down
 ```
 
-En esta máquina, el puerto 8000 del host puede estar ocupado por otro proyecto (`cpat-api`). No lo detengas: usa `AUTOS_PORT=8002 docker compose up -d`.
+En esta máquina, el puerto 8000 del host puede estar ocupado por otro proyecto (`cpat-api`). No lo detengas: usa `AUTOS_PORT=8002 just dev` (o `AUTOS_PORT=8002 docker compose up -d`).
 
 ## Verificación
 

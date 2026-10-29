@@ -149,17 +149,6 @@ AUTOS_PORT=8002 USUARIOS_PORT=8011 WEB_PORT=3001 docker compose up -d
 
 Solo cambian los puertos de **tu máquina**. La web habla con las APIs por la red interna de Docker, así que cambiar los puertos de las APIs no la afecta.
 
-### Desarrollar el frontend con recarga en caliente
-
-Las APIs siguen en Docker y la web corre en local con Node 24.15 o superior:
-
-```bash
-docker compose up -d api-usuarios api-autos && docker compose stop web
-cd apps/web && npm install && npm run dev        # http://localhost:3000
-```
-
-Más detalles en [docs/apps/web.md](docs/apps/web.md).
-
 ### Problemas frecuentes
 
 | Síntoma | Solución |
@@ -175,6 +164,44 @@ Más detalles en [docs/apps/web.md](docs/apps/web.md).
 | `bind: address already in use` | Un puerto está ocupado: ver [Si un puerto está ocupado](#si-un-puerto-está-ocupado). |
 
 Cada guía de `docs/` tiene su propia tabla de solución de problemas con más casos.
+
+## Desarrollo con `just` (recarga en caliente)
+
+Para desarrollar, el [`justfile`](justfile) levanta las APIs y el frontend en **modo desarrollo**. El código de tu máquina se monta dentro de los contenedores y cada servicio se recompila solo al guardar un archivo. No hace falta reconstruir imágenes ni tener Python o Node instalados localmente.
+
+```bash
+brew install just      # una sola vez (Linux/Windows: https://just.systems)
+just setup             # crea los .env que falten (y genera JWT_SECRET_KEY); luego edita DB_PASS y ADMIN_*
+just dev               # levanta todo en modo desarrollo, con logs en vivo (Ctrl+C para detener)
+```
+
+| Qué cambias | Qué pasa |
+|---|---|
+| Código Python de `services/*/app/` | uvicorn recarga la API en 1 o 2 segundos |
+| `libs/auth-jwt/` | Se recargan las dos APIs |
+| Páginas, componentes o el BFF en `apps/web/` | Nuxt recompila; en el navegador el cambio aparece solo (HMR) |
+| Una migración nueva | `just migrate` (sin reiniciar) |
+| `requirements.txt`, `package.json`, Dockerfile o `docker-compose*.yml` | Vuelve a ejecutar `just dev` |
+
+Tareas disponibles (`just` sin argumentos las lista):
+
+| Tarea | Para qué |
+|---|---|
+| `just setup` | Crear los `.env` que falten (nunca sobrescribe) |
+| `just dev` / `just dev-d` | Modo desarrollo, en primer plano o en segundo plano |
+| `just up` | Modo producción (imágenes compiladas, como en el paso 5) |
+| `just down` | Detener todo, en cualquiera de los dos modos |
+| `just ps` / `just logs [servicio]` | Estado / logs (`just logs api-autos`) |
+| `just shell <servicio>` | Terminal dentro de un contenedor |
+| `just migrate [servicio]` | Aplicar migraciones pendientes |
+| `just migration <servicio> <rev> "<mensaje>"` | Generar una migración (`just migration api-autos 0002 "agregar color"`) |
+| `just test ["carpeta"]` | Ejecutar la colección de Postman (requiere Node para `npx`) |
+| `just typecheck` | Comprobar los tipos del frontend (con `just dev` en marcha) |
+| `just build` | Construir las imágenes de producción |
+
+Los puertos se cambian igual que con Compose: `AUTOS_PORT=8002 just dev`.
+
+En desarrollo, el frontend corre en el contenedor `web-dev` (`nuxt dev`) en lugar de `web`. Usa los mismos puertos, así que no se pueden tener los dos a la vez: `just dev` quita el de producción y `just up` quita el de desarrollo. Los detalles están en [`docker-compose.dev.yml`](docker-compose.dev.yml).
 
 ## Probar las APIs
 

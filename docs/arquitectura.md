@@ -12,7 +12,9 @@
 ├── libs/                  Código compartido entre servicios y/o apps
 │   └── auth-jwt/          Emisión y validación de JWT (paquete Python)
 ├── docs/                  Toda la documentación
-├── docker-compose.yml     Orquesta todos los servicios y apps
+├── docker-compose.yml     Orquesta todos los servicios y apps (producción)
+├── docker-compose.dev.yml Overrides de desarrollo: código montado + recarga en caliente
+├── justfile               Tareas con `just` (just dev, just up, just test...)
 ├── API_Monorepo.postman_collection.json  Pruebas end-to-end de todas las APIs y el BFF
 ├── .env                   Configuración compartida (JWT_SECRET_KEY). No se versiona.
 ├── .github/workflows/     release-please (releases) y pr-title (valida Conventional Commits)
