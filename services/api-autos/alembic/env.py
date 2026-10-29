@@ -31,11 +31,26 @@ if config.config_file_name is not None:
 target_metadata = SQLModel.metadata
 
 
+def incluir_objeto(objeto, nombre, tipo, reflejado, comparado_con) -> bool:
+    """
+    La BD "autos" es COMPARTIDA con otros servicios del monorepo (p. ej.
+    api-usuarios crea ahí su tabla "usuarios"). Cada servicio gestiona solo
+    SUS tablas: si una tabla existe en la BD (reflejado=True) pero no está en
+    los modelos de este servicio (comparado_con=None), se ignora. Sin esto,
+    `alembic revision --autogenerate` propondría borrar las tablas del otro
+    servicio.
+    """
+    if tipo == "table" and reflejado and comparado_con is None:
+        return False
+    return True
+
+
 def run_migrations_offline() -> None:
     """Modo 'offline': genera el SQL (alembic upgrade head --sql) sin conectarse."""
     context.configure(
         url=settings.database_url.render_as_string(hide_password=False),
         target_metadata=target_metadata,
+        include_object=incluir_objeto,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
     )
@@ -49,7 +64,11 @@ def run_migrations_online() -> None:
     connectable = create_engine(settings.database_url, poolclass=pool.NullPool)
 
     with connectable.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata)
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            include_object=incluir_objeto,
+        )
 
         with context.begin_transaction():
             context.run_migrations()

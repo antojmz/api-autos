@@ -1,46 +1,74 @@
 # =============================================================================
 # docker-compose.yml — Orquestación de TODO el monorepo.
 #
-# Se ejecuta siempre desde la RAÍZ del repositorio. Cada servicio (backend,
-# carpeta services/) o app (frontend, carpeta apps/) se declara aquí con su
-# propio contexto de construcción (build: ./services/<nombre>).
+# Se ejecuta siempre desde la RAÍZ del repositorio. Compose lee además el
+# archivo .env de la raíz para sustituir las variables ${...} de este archivo
+# (por ejemplo ${JWT_SECRET_KEY}).
 #
-#   docker compose build                # construir todas las imágenes
-#   docker compose up -d                # levantar todo en segundo plano
-#   docker compose up -d api-autos      # levantar solo un servicio
-#   docker compose logs -f api-autos    # ver logs de un servicio
-#   docker compose down                 # detener y eliminar los contenedores
+#   docker compose build                  # construir todas las imágenes
+#   docker compose up -d                  # levantar todo en segundo plano
+#   docker compose up -d api-usuarios     # levantar solo un servicio
+#   docker compose logs -f api-autos      # ver logs de un servicio
+#   docker compose down                   # detener y eliminar los contenedores
 #
-# Para añadir un servicio o app: crear su carpeta con su Dockerfile y añadir
-# un bloque nuevo bajo "services:" siguiendo el mismo patrón.
+# PostgreSQL NO corre en Docker: se usa el instalado en la máquina (host).
+# Ambos servicios usan la MISMA base de datos ("autos", esquema public); cada
+# uno crea y migra solo sus propias tablas. Desde dentro de un contenedor,
+# "localhost" es el propio contenedor: al host se llega con
+# "host.docker.internal".
+#
+# El contexto de construcción es la RAÍZ (context: .) para que los Dockerfiles
+# puedan instalar las librerías compartidas de libs/.
 # =============================================================================
+
+# Configuración común a todos los servicios Python (ancla YAML: se reutiliza
+# con "<<: *servicio-python"). Los campos con "x-" Compose los ignora.
+x-servicio-python: &servicio-python
+  environment: &entorno-comun
+    # Sobrescribe DB_HOST=localhost del .env de cada servicio.
+    DB_HOST: host.docker.internal
+    # Clave JWT compartida, desde el .env de la RAÍZ. ":?" hace que Compose
+    # se niegue a arrancar si no está definida.
+    JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Define JWT_SECRET_KEY en el .env de la raíz (ver .env.example)}
+    JWT_MINUTOS_EXPIRACION: ${JWT_MINUTOS_EXPIRACION:-30}
+    # Aplica `alembic upgrade head` al arrancar (false para desactivarlo).
+    RUN_MIGRATIONS: "true"
+  # En Docker Desktop (Mac/Windows) host.docker.internal ya existe; esta
+  # línea lo habilita también en Linux.
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+  restart: unless-stopped
 
 services:
   # ---------------------------------------------------------------------------
-  # Backend: API Concesionario de Autos (FastAPI) — services/api-autos
-  #
-  # PostgreSQL NO corre en Docker: se usa el que está instalado en la máquina
-  # (host). Desde dentro del contenedor, "localhost" es el propio contenedor,
-  # por eso se llega al host con el nombre especial "host.docker.internal".
+  # Autenticación y usuarios — services/api-usuarios
+  # Emite los tokens JWT que usan los demás servicios.
+  # ---------------------------------------------------------------------------
+  api-usuarios:
+    <<: *servicio-python
+    build:
+      context: .
+      dockerfile: services/api-usuarios/Dockerfile
+    image: api-usuarios:latest
+    container_name: api-usuarios
+    env_file: ./services/api-usuarios/.env
+    ports:
+      # Solo en 127.0.0.1 (no expuesto a la red). Puerto del host: 8001 por
+      # defecto; se cambia con USUARIOS_PORT.
+      - "127.0.0.1:${USUARIOS_PORT:-8001}:8000"
+
+  # ---------------------------------------------------------------------------
+  # Concesionario de autos — services/api-autos
+  # Todas sus rutas exigen un token emitido por api-usuarios.
   # ---------------------------------------------------------------------------
   api-autos:
-    build: ./services/api-autos
+    <<: *servicio-python
+    build:
+      context: .
+      dockerfile: services/api-autos/Dockerfile
     image: api-autos:latest
     container_name: api-autos
-    # Credenciales y configuración del servicio (no se copian a la imagen).
     env_file: ./services/api-autos/.env
-    environment:
-      # Sobrescribe DB_HOST=localhost del .env para apuntar al PostgreSQL del host.
-      DB_HOST: host.docker.internal
-      # Aplica `alembic upgrade head` al arrancar (false para desactivarlo).
-      RUN_MIGRATIONS: "true"
-    # En Docker Desktop (Mac/Windows) host.docker.internal ya existe; esta
-    # línea lo habilita también en Linux.
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     ports:
-      # "ip:puerto_del_host:puerto_del_contenedor". Solo en 127.0.0.1: la API
-      # no queda expuesta a otras máquinas de la red. El puerto del host es
-      # 8000 por defecto; si está ocupado: API_PORT=8001 docker compose up -d
-      - "127.0.0.1:${API_PORT:-8000}:8000"
-    restart: unless-stopped
+      # Puerto del host: 8000 por defecto; se cambia con AUTOS_PORT.
+      - "127.0.0.1:${AUTOS_PORT:-8000}:8000"

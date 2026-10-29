@@ -27,12 +27,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
+from auth_jwt import get_config_jwt
 from app.config import settings
 from app.routers import autos, modelos
 
 # Los detalles técnicos de los errores van al log del SERVIDOR, nunca al cliente.
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger("api_autos")
+
+# Falla AL ARRANCAR (no en la primera petición) si falta JWT_SECRET_KEY o es
+# demasiado corta: sin ella no se pueden validar los tokens.
+get_config_jwt()
 
 # ---------------------------------------------------------------------------
 # 1. Creación de la aplicación
@@ -42,7 +47,11 @@ logger = logging.getLogger("api_autos")
 # modelos Pydantic declarados en cada endpoint.
 app = FastAPI(
     title="API Concesionario de Autos",
-    description="Demo educativa de FastAPI + PostgreSQL: CRUD de autos y sus modelos.",
+    description=(
+        "Demo educativa de FastAPI + PostgreSQL: CRUD de autos y sus modelos.\n\n"
+        "**Autenticación**: todas las rutas (salvo `/`) requieren un token JWT. "
+        "Obténlo en api-usuarios (`POST /auth/login`) y pégalo en el botón *Authorize*."
+    ),
     version="1.0.0",
 )
 
@@ -55,7 +64,8 @@ app = FastAPI(
 # CORS (Cross-Origin Resource Sharing): indica a los NAVEGADORES qué sitios web
 # pueden llamar a esta API con JavaScript. Buenas prácticas:
 #   - Lista explícita de orígenes, nunca "*" en una API real.
-#   - allow_credentials=False: la API no usa cookies ni autenticación.
+#   - allow_credentials=False: la API no usa cookies; el token JWT viaja en
+#     la cabecera Authorization, que el frontend añade explícitamente.
 #     (Combinar "*" con credenciales es una mala configuración clásica.)
 #   - Solo los métodos y cabeceras que realmente usamos.
 app.add_middleware(
@@ -63,7 +73,8 @@ app.add_middleware(
     allow_origins=settings.cors_origins,
     allow_credentials=False,
     allow_methods=["GET", "POST", "PUT", "DELETE"],
-    allow_headers=["Content-Type"],
+    # Authorization: necesaria para enviar el token JWT (Bearer).
+    allow_headers=["Content-Type", "Authorization"],
 )
 
 

@@ -1,13 +1,42 @@
 {
   "info": {
     "name": "API Concesionario de Autos",
-    "description": "Colección para probar la API demo (FastAPI + PostgreSQL).\n\n1. Levanta la API: `uvicorn app.main:app --reload --host 127.0.0.1 --port 8000`\n2. Ejecuta las carpetas en orden (o la colección completa con el Collection Runner).\n\nLas variables `autoId` y `modeloId` se rellenan solas al crear recursos. Si usas otro host/puerto, cambia la variable `baseUrl`.",
+    "description": "Colección para probar api-autos. Todas sus rutas (salvo `/`) requieren un token JWT emitido por api-usuarios.\n\n1. Levanta los servicios desde la raíz del monorepo: `docker compose up -d`\n2. Pon en la variable de colección `adminPassword` el valor de `ADMIN_PASSWORD` de `services/api-usuarios/.env`.\n3. Ejecuta la colección completa con el Collection Runner. La carpeta \"0. Autenticación\" obtiene los tokens.\n\nLas variables `token`, `userToken`, `autoId` y `modeloId` se rellenan solas. Si usas otros puertos, cambia `baseUrl` y `baseUrlUsuarios`.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
     {
       "key": "baseUrl",
       "value": "http://127.0.0.1:8000"
+    },
+    {
+      "key": "baseUrlUsuarios",
+      "value": "http://127.0.0.1:8001"
+    },
+    {
+      "key": "adminUsername",
+      "value": "admin"
+    },
+    {
+      "key": "adminPassword",
+      "value": "",
+      "description": "ADMIN_PASSWORD de services/api-usuarios/.env"
+    },
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "userToken",
+      "value": ""
+    },
+    {
+      "key": "userId",
+      "value": ""
+    },
+    {
+      "key": "runId",
+      "value": ""
     },
     {
       "key": "autoId",
@@ -19,6 +48,164 @@
     }
   ],
   "item": [
+    {
+      "name": "0. Autenticación",
+      "description": "Obtiene los tokens en api-usuarios: admin (`token`) y un usuario normal (`userToken`).",
+      "item": [
+        {
+          "name": "Login admin (api-usuarios)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set(\"runId\", String(Date.now()).slice(-8));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.collectionVariables.set(\"token\", pm.response.json().access_token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrlUsuarios}}/auth/login",
+              "host": [
+                "{{baseUrlUsuarios}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Guarda el token del admin en `token`.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "username",
+                  "value": "{{adminUsername}}",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "{{adminPassword}}",
+                  "type": "text"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Registrar usuario normal (api-usuarios)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código HTTP 201\", function () { pm.response.to.have.status(201); });",
+                  "pm.collectionVariables.set(\"userId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrlUsuarios}}/auth/registro",
+              "host": [
+                "{{baseUrlUsuarios}}"
+              ],
+              "path": [
+                "auth",
+                "registro"
+              ]
+            },
+            "description": "Usuario sin rol admin, para probar el 403.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"autos.{{runId}}\",\n  \"email\": \"autos.{{runId}}@example.com\",\n  \"nombre_completo\": \"Usuario Autos\",\n  \"password\": \"Clave-Inicial-2026\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Login usuario normal (api-usuarios)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.collectionVariables.set(\"userToken\", pm.response.json().access_token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrlUsuarios}}/auth/login",
+              "host": [
+                "{{baseUrlUsuarios}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Guarda su token en `userToken`.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "username",
+                  "value": "autos.{{runId}}",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "Clave-Inicial-2026",
+                  "type": "text"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
     {
       "name": "1. General",
       "description": "Comprobar que la API responde.",
@@ -46,7 +233,10 @@
               ],
               "path": []
             },
-            "description": "Endpoint raíz con enlace a la documentación."
+            "description": "Endpoint raíz con enlace a la documentación.",
+            "auth": {
+              "type": "noauth"
+            }
           }
         }
       ]
@@ -1037,6 +1227,202 @@
       ]
     },
     {
+      "name": "6. Autenticación y permisos",
+      "description": "Rutas protegidas: 401 sin token o con token inválido; 403 sin rol admin.",
+      "item": [
+        {
+          "name": "Listar autos sin token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código HTTP 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"Cabecera WWW-Authenticate: Bearer\", function () { pm.response.to.have.header(\"WWW-Authenticate\", \"Bearer\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/autos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "autos"
+              ]
+            },
+            "description": "Falta la cabecera Authorization.",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Listar autos con token manipulado",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código HTTP 401\", function () { pm.response.to.have.status(401); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}x"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/autos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "autos"
+              ]
+            },
+            "description": "Firma alterada.",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Crear modelo sin token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código HTTP 401\", function () { pm.response.to.have.status(401); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/modelo",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "modelo"
+              ]
+            },
+            "description": "También /modelo está protegido.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"auto_id\": {{autoId}},\n  \"nombre\": \"X\",\n  \"anio\": 2024,\n  \"precio\": 100\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Usuario normal lista autos",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código HTTP 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/autos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "autos"
+              ]
+            },
+            "description": "Cualquier usuario autenticado puede leer.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Usuario normal elimina un auto",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código HTTP 403\", function () { pm.response.to.have.status(403); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/autos/{{autoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "autos",
+                "{{autoId}}"
+              ]
+            },
+            "description": "Eliminar autos requiere rol admin.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "5. Limpieza",
       "description": "Elimina el auto creado (y sus modelos en cascada).",
       "item": [
@@ -1097,8 +1483,47 @@
             },
             "description": "Tras borrar, el auto ya no existe."
           }
+        },
+        {
+          "name": "Eliminar usuario normal (api-usuarios)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código HTTP 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrlUsuarios}}/usuarios/{{userId}}",
+              "host": [
+                "{{baseUrlUsuarios}}"
+              ],
+              "path": [
+                "usuarios",
+                "{{userId}}"
+              ]
+            },
+            "description": "Soft delete del usuario de prueba."
+          }
         }
       ]
     }
-  ]
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  }
 }

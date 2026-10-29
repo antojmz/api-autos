@@ -7,8 +7,12 @@
 # Ventajas: la imagen final es más pequeña y no contiene cachés de pip ni
 # herramientas de compilación (menos superficie de ataque).
 #
+# El contexto de construcción es la RAÍZ del monorepo (para poder instalar la
+# librería compartida libs/auth-jwt); por eso las rutas de COPY empiezan con
+# services/api-autos/. Qué archivos entran: ver Dockerfile.dockerignore.
+#
 # Construir (desde la raíz del monorepo):  docker compose build api-autos
-# o, sin Compose:  docker build -t api-autos services/api-autos
+# o, sin Compose:  docker build -f services/api-autos/Dockerfile -t api-autos .
 # =============================================================================
 
 # -----------------------------------------------------------------------------
@@ -25,9 +29,13 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 # Se copia SOLO requirements.txt antes que el código: Docker cachea esta capa
 # y no reinstala las dependencias cada vez que cambia un archivo .py.
-COPY requirements.txt /tmp/requirements.txt
+COPY services/api-autos/requirements.txt /tmp/requirements.txt
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r /tmp/requirements.txt
+
+# Librería compartida del monorepo (validación de tokens JWT).
+COPY libs/auth-jwt /tmp/libs/auth-jwt
+RUN pip install --no-cache-dir /tmp/libs/auth-jwt
 
 # -----------------------------------------------------------------------------
 # Etapa 2: runtime — imagen final
@@ -52,11 +60,11 @@ WORKDIR /app
 COPY --from=builder /opt/venv /opt/venv
 
 # Código de la aplicación y migraciones. El archivo .env NO se copia (está en
-# .dockerignore): las credenciales se pasan al contenedor al ejecutarlo.
-COPY --chown=appuser:appuser alembic.ini ./
-COPY --chown=appuser:appuser alembic ./alembic
-COPY --chown=appuser:appuser app ./app
-COPY --chown=appuser:appuser --chmod=755 docker/entrypoint.sh ./docker/entrypoint.sh
+# Dockerfile.dockerignore): las credenciales se pasan al contenedor al ejecutarlo.
+COPY --chown=appuser:appuser services/api-autos/alembic.ini ./
+COPY --chown=appuser:appuser services/api-autos/alembic ./alembic
+COPY --chown=appuser:appuser services/api-autos/app ./app
+COPY --chown=appuser:appuser --chmod=755 services/api-autos/docker/entrypoint.sh ./docker/entrypoint.sh
 
 USER appuser
 

@@ -1,0 +1,18 @@
+# Archivos que se envían a Docker al construir la imagen de api-autos.
+#
+# El contexto de construcción es la RAÍZ del monorepo (para poder instalar
+# libs/auth-jwt), así que se usa una LISTA BLANCA: se excluye todo ("*") y se
+# permite solo lo necesario. Así nunca entran a la imagen los .env, otros
+# servicios, la documentación, etc.
+# BuildKit usa este archivo porque se llama igual que el Dockerfile + ".dockerignore".
+*
+!libs/auth-jwt
+!services/api-autos/requirements.txt
+!services/api-autos/alembic.ini
+!services/api-autos/alembic
+!services/api-autos/app
+!services/api-autos/docker
+**/__pycache__
+**/*.pyc
+**/*.egg-info
+**/.env
