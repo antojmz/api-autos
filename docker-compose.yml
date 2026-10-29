@@ -1,23 +1,34 @@
 # =============================================================================
-# docker-compose.yml — Levanta la API en un contenedor.
+# docker-compose.yml — Orquestación de TODO el monorepo.
 #
-# PostgreSQL NO corre en Docker: se usa el que está instalado en la máquina
-# (host). Desde dentro del contenedor, "localhost" es el propio contenedor,
-# por eso se llega al host con el nombre especial "host.docker.internal".
+# Se ejecuta siempre desde la RAÍZ del repositorio. Cada servicio (backend,
+# carpeta services/) o app (frontend, carpeta apps/) se declara aquí con su
+# propio contexto de construcción (build: ./services/<nombre>).
 #
-#   docker compose build        # construir la imagen
-#   docker compose up -d        # levantar en segundo plano
-#   docker compose logs -f api  # ver logs
-#   docker compose down         # detener y eliminar el contenedor
+#   docker compose build                # construir todas las imágenes
+#   docker compose up -d                # levantar todo en segundo plano
+#   docker compose up -d api-autos      # levantar solo un servicio
+#   docker compose logs -f api-autos    # ver logs de un servicio
+#   docker compose down                 # detener y eliminar los contenedores
+#
+# Para añadir un servicio o app: crear su carpeta con su Dockerfile y añadir
+# un bloque nuevo bajo "services:" siguiendo el mismo patrón.
 # =============================================================================
 
 services:
-  api:
-    build: .
+  # ---------------------------------------------------------------------------
+  # Backend: API Concesionario de Autos (FastAPI) — services/api-autos
+  #
+  # PostgreSQL NO corre en Docker: se usa el que está instalado en la máquina
+  # (host). Desde dentro del contenedor, "localhost" es el propio contenedor,
+  # por eso se llega al host con el nombre especial "host.docker.internal".
+  # ---------------------------------------------------------------------------
+  api-autos:
+    build: ./services/api-autos
     image: api-autos:latest
     container_name: api-autos
-    # Credenciales y configuración desde .env (no se copian a la imagen).
-    env_file: .env
+    # Credenciales y configuración del servicio (no se copian a la imagen).
+    env_file: ./services/api-autos/.env
     environment:
       # Sobrescribe DB_HOST=localhost del .env para apuntar al PostgreSQL del host.
       DB_HOST: host.docker.internal

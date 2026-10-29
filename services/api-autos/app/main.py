@@ -13,9 +13,9 @@ Estructura del proyecto:
 Este archivo crea la aplicación, configura la seguridad básica (CORS y
 cabeceras), define el manejo centralizado de errores y registra los routers.
 
-Cómo ejecutarla (con Docker, desde la carpeta del proyecto; ver README.md):
-    docker compose build     # construye la imagen (venv en /opt/venv)
-    docker compose up -d     # aplica migraciones y arranca uvicorn
+Cómo ejecutarla (con Docker, desde la RAÍZ del monorepo; ver docs/services/api-autos.md):
+    docker compose build api-autos     # construye la imagen (venv en /opt/venv)
+    docker compose up -d api-autos     # aplica migraciones y arranca uvicorn
 Documentación interactiva: http://127.0.0.1:8000/docs  (o /redoc)
 """
 

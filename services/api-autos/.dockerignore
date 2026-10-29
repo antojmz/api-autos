@@ -5,12 +5,8 @@
 .venv/
 __pycache__/
 *.pyc
-# Control de versiones, documentación y herramientas que la imagen no necesita
-.git
-.gitignore
-*.postman_collection.json
+# Archivos del servicio que la imagen no necesita
+postman/
 CLAUDE.md
-README.md
 Dockerfile
-docker-compose.yml
 .dockerignore

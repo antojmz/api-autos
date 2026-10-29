@@ -7,7 +7,8 @@
 # Ventajas: la imagen final es más pequeña y no contiene cachés de pip ni
 # herramientas de compilación (menos superficie de ataque).
 #
-# Construir:  docker compose build      (o: docker build -t api-autos .)
+# Construir (desde la raíz del monorepo):  docker compose build api-autos
+# o, sin Compose:  docker build -t api-autos services/api-autos
 # =============================================================================
 
 # -----------------------------------------------------------------------------

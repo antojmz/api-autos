@@ -7,7 +7,7 @@
 # 2. Arranca la API con uvicorn.
 #
 # Si se pasa un comando al contenedor, se ejecuta ese comando en su lugar.
-# Ejemplo: docker compose run --rm api alembic current
+# Ejemplo: docker compose run --rm api-autos alembic current
 # =============================================================================
 
 # set -e: si un comando falla (p. ej. la migración), el contenedor se detiene
