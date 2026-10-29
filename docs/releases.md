@@ -40,9 +40,9 @@ Formato: `tipo(scope opcional): descripción en español, en minúscula y sin pu
 
 | Tipo | Cuándo | Efecto en la versión | En el CHANGELOG |
 |---|---|---|---|
-| `feat` | funcionalidad nueva | menor: 1.0.0 → **1.1.0** | Funcionalidades |
-| `fix` | corrección de un error | parche: 1.0.0 → **1.0.1** | Correcciones |
-| `perf` | mejora de rendimiento | parche | Rendimiento |
+| `feat` | funcionalidad nueva | menor: 1.0.0 → **1.1.0** | Nuevas Funcionalidades |
+| `fix` | corrección de un error | parche: 1.0.0 → **1.0.1** | Correcciones de Errores |
+| `perf` | mejora de rendimiento | parche | Mejoras de Rendimiento |
 | `revert` | revertir un commit | parche | Reversiones |
 | `docs` | solo documentación | ninguno* | Documentación |
 | `refactor` | cambio interno sin cambiar comportamiento | ninguno* | Refactorización |
