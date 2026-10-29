@@ -20,7 +20,7 @@ from fastapi import Depends, HTTPException, Path, Query, status
 from sqlmodel import Session
 
 from app.database import get_session
-from app.models import Auto
+from app.models import Auto, Modelo
 
 LIMITE_MAXIMO_PAGINA = 100
 
@@ -64,3 +64,16 @@ def obtener_auto_o_404(
 
 
 AutoDep = Annotated[Auto, Depends(obtener_auto_o_404)]
+
+
+def obtener_modelo_o_404(
+    modelo_id: Annotated[int, Path(gt=0, description="ID del modelo")],
+    session: SessionDep,
+) -> Modelo:
+    modelo = session.get(Modelo, modelo_id)
+    if modelo is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Modelo no encontrado")
+    return modelo
+
+
+ModeloDep = Annotated[Modelo, Depends(obtener_modelo_o_404)]
