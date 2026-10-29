@@ -54,6 +54,17 @@ Cada servicio tiene su propio `CLAUDE.md` con sus reglas. **Antes de tocar un se
 - No hay entornos virtuales locales: todo se ejecuta en Docker.
 - No añadir herramientas de monorepo JS (pnpm workspaces, Turborepo, Nx) hasta que exista al menos una app que las necesite.
 
+## Commits y releases
+
+- **Conventional Commits obligatorio**: `tipo(scope opcional): descripción en español`.
+  - Tipos: `feat`, `fix`, `perf`, `refactor`, `docs`, `test`, `build`, `ci`, `chore` y `revert`.
+  - Scopes: `api-autos`, `api-usuarios`, `auth-jwt`, `docs` y `monorepo`.
+  - Para un cambio incompatible: `feat!:` o el pie `BREAKING CHANGE:`.
+- release-please calcula la versión a partir de esos mensajes. Usa una **sola versión para todo el repo**, con tags `vX.Y.Z`.
+- **No editar a mano** `version.txt`, `.release-please-manifest.json`, `CHANGELOG.md` ni las líneas marcadas `# x-release-please-version` (`version=` en los `main.py`, y `version` en `libs/auth-jwt/pyproject.toml`).
+- Si se añade un archivo nuevo con versión, registrarlo en `extra-files` de `release-please-config.json`.
+- Guía completa: `docs/releases.md`.
+
 ## Comandos (desde la raíz)
 
 ```bash

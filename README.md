@@ -44,3 +44,4 @@ Toda la documentación está en [`docs/`](docs/README.md):
 - [Backend `api-usuarios`: autenticación y usuarios](docs/services/api-usuarios.md)
 - [Backend `api-autos`: instalación, operación y solución de problemas](docs/services/api-autos.md)
 - [Librería `auth-jwt`](docs/libs/auth-jwt.md)
+- [Versionado y releases (release-please)](docs/releases.md): los commits siguen Conventional Commits (`feat:`, `fix:`...)
