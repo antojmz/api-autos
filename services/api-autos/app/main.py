@@ -53,7 +53,7 @@ app = FastAPI(
         "Obténlo en api-usuarios (`POST /auth/login`) y pégalo en el botón *Authorize*."
     ),
     # La versión la actualiza release-please en cada release (no editar a mano).
-    version="1.0.0",  # x-release-please-version
+    version="1.1.0",  # x-release-please-version
 )
 
 # ---------------------------------------------------------------------------
