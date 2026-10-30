@@ -120,8 +120,10 @@ Antes de cada `git commit`, [pre-commit](https://pre-commit.com) revisa automát
 ```bash
 brew install pre-commit      # una vez (alternativa: pipx install pre-commit)
 just hooks                   # instala los hooks en este clon (just setup también lo hace)
-# sin just:  pre-commit install --install-hooks
+# sin just:  pre-commit install --install-hooks --allow-missing-config --hook-type pre-commit --hook-type commit-msg
 ```
+
+Los hooks se instalan para **todo el repositorio**. En una rama antigua que todavía no tiene `.pre-commit-config.yaml`, solo muestran el aviso `config file not found. Skipping` y dejan hacer el commit.
 
 - **Si un hook corrige algo** (formato o espacios), el commit se detiene: revisa los cambios con `git diff`, vuelve a hacer `git add` y repite el commit.
 - **Revisar todo el repositorio a mano**: `just lint` (o `pre-commit run --all-files`).
