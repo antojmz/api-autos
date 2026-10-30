@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "auth-jwt"
-version = "1.0.0"
+version = "1.1.0"
 description = "Emisión y validación de JWT compartida por los servicios del monorepo"
 requires-python = ">=3.13"
 dependencies = [
