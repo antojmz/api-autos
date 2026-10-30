@@ -31,7 +31,7 @@ default:
 # Configuración
 # -----------------------------------------------------------------------------
 
-# Crea los .env que falten a partir de los .env.example (nunca sobrescribe) y genera JWT_SECRET_KEY.
+# Crea los .env que falten a partir de los .env.example (nunca sobrescribe), genera JWT_SECRET_KEY e instala los hooks.
 setup:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -52,6 +52,22 @@ setup:
             echo "• ${destino} ya existe (no se modifica)"
         fi
     done
+    # Hooks de pre-commit (revisiones antes de cada commit), si está instalado.
+    if command -v pre-commit >/dev/null 2>&1; then
+        just hooks >/dev/null && echo "✔ hooks de pre-commit instalados"
+    else
+        echo "• pre-commit no está instalado: brew install pre-commit && just hooks"
+    fi
+
+# Instala los hooks de pre-commit (revisiones antes de cada commit y del mensaje).
+# --allow-missing-config: los hooks son de todo el repositorio; en ramas antiguas
+# sin .pre-commit-config.yaml solo avisan, en vez de impedir el commit.
+hooks:
+    pre-commit install --install-hooks --allow-missing-config --hook-type pre-commit --hook-type commit-msg
+
+# Ejecuta todas las revisiones de pre-commit sobre el repositorio completo.
+lint:
+    pre-commit run --all-files
 
 # -----------------------------------------------------------------------------
 # Desarrollo (recarga en caliente)

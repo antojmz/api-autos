@@ -12,16 +12,16 @@ guarda como un archivo en alembic/versions/ y se aplica con:
 
 from logging.config import fileConfig
 
+from alembic import context
 from sqlalchemy import create_engine, pool
 from sqlmodel import SQLModel
 
-from alembic import context
+from app import models  # noqa: F401
 
 # Importar la configuración (lee .env) y los modelos. Importar app.models
 # registra las tablas en SQLModel.metadata, que Alembic compara con la base
 # de datos real para autogenerar migraciones.
 from app.config import settings
-from app import models  # noqa: F401
 
 config = context.config
 

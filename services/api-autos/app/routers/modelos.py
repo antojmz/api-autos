@@ -16,7 +16,6 @@ FastAPI prueba las rutas en orden; si "/modelos/{modelo_id}" fuera primero,
 
 from typing import Annotated
 
-from auth_jwt import Rol, obtener_claims, requiere_rol
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import selectinload
 from sqlmodel import col, func, select
@@ -24,6 +23,7 @@ from sqlmodel import col, func, select
 from app.dependencies import ModeloDep, PaginacionDep, SessionDep
 from app.models import Auto, Modelo
 from app.schemas import AutoConModelos, ModeloCreate, ModeloPublic, ModeloUpdate, Pagina
+from auth_jwt import Rol, obtener_claims, requiere_rol
 
 # Todas las rutas exigen un token JWT válido (ver routers/autos.py).
 router = APIRouter(
@@ -75,9 +75,7 @@ def crear_modelo(datos: ModeloCreate, session: SessionDep) -> Modelo:
     response_model=Pagina[AutoConModelos],
     summary="Listar autos con sus modelos (paginado)",
 )
-def listar_autos_con_modelos(
-    session: SessionDep, paginacion: PaginacionDep
-) -> Pagina[AutoConModelos]:
+def listar_autos_con_modelos(session: SessionDep, paginacion: PaginacionDep) -> Pagina[AutoConModelos]:
     total = session.exec(select(func.count()).select_from(Auto)).one()
 
     # selectinload: carga los modelos de TODOS los autos de la página en una
@@ -114,9 +112,7 @@ def listar_modelos(
         consulta = consulta.where(Modelo.auto_id == auto_id)
 
     total = session.exec(select(func.count()).select_from(consulta.subquery())).one()
-    modelos = session.exec(
-        consulta.order_by(col(Modelo.id)).offset(paginacion.skip).limit(paginacion.limit)
-    ).all()
+    modelos = session.exec(consulta.order_by(col(Modelo.id)).offset(paginacion.skip).limit(paginacion.limit)).all()
     return Pagina[ModeloPublic](
         total=total,
         skip=paginacion.skip,

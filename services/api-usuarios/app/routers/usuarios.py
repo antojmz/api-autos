@@ -19,7 +19,6 @@ from typing import Annotated
 from fastapi import APIRouter, HTTPException, Query, status
 from sqlmodel import Session, col, func, or_, select
 
-from auth_jwt import Rol
 from app.dependencies import AdminDep, PaginacionDep, SessionDep, UsuarioActualDep, UsuarioPorIdDep
 from app.models import Usuario, ahora_utc
 from app.schemas import (
@@ -32,6 +31,7 @@ from app.schemas import (
 )
 from app.seguridad import hashear_password, verificar_password
 from app.servicios import crear_usuario, marcar_actualizado, verificar_unicidad
+from auth_jwt import Rol
 
 router = APIRouter(
     prefix="/usuarios",
@@ -162,9 +162,7 @@ def listar_usuarios(
         consulta = consulta.where(Usuario.activo == activo)
 
     total = session.exec(select(func.count()).select_from(consulta.subquery())).one()
-    usuarios = session.exec(
-        consulta.order_by(col(Usuario.id)).offset(paginacion.skip).limit(paginacion.limit)
-    ).all()
+    usuarios = session.exec(consulta.order_by(col(Usuario.id)).offset(paginacion.skip).limit(paginacion.limit)).all()
     return Pagina[UsuarioPublic](
         total=total,
         skip=paginacion.skip,
@@ -204,9 +202,7 @@ def actualizar_usuario(
     if objetivo.eliminado_en is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado")
     # Evita que el sistema se quede sin administradores por accidente.
-    if objetivo.id == admin.id and (
-        (datos.rol is not None and datos.rol != Rol.ADMIN) or datos.activo is False
-    ):
+    if objetivo.id == admin.id and ((datos.rol is not None and datos.rol != Rol.ADMIN) or datos.activo is False):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="No puedes quitarte el rol de admin ni desactivar tu propia cuenta",

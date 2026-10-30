@@ -27,9 +27,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
-from auth_jwt import get_config_jwt
 from app.config import settings
 from app.routers import autos, modelos
+from auth_jwt import get_config_jwt
 
 # Los detalles técnicos de los errores van al log del SERVIDOR, nunca al cliente.
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")

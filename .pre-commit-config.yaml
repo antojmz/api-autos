@@ -1,0 +1,93 @@
+# =============================================================================
+# .pre-commit-config.yaml — Revisiones automáticas antes de cada commit.
+#
+# Instalar (una vez por clon):
+#   brew install pre-commit      # o: pipx install pre-commit
+#   just hooks                   # = pre-commit install --install-hooks
+#
+# Uso:
+#   - Se ejecuta SOLO al hacer `git commit`, sobre los archivos preparados.
+#     Si un hook corrige algo (formato, espacios), el commit se detiene:
+#     revisa los cambios, vuelve a hacer `git add` y repite el commit.
+#   - `just lint` (= pre-commit run --all-files) revisa todo el repositorio.
+#   - Saltarlo (`git commit --no-verify`) está desaconsejado: se pierde la
+#     protección contra secretos.
+#
+# Guía: README.md (sección "Hooks de pre-commit").
+# =============================================================================
+
+# Un solo `pre-commit install` instala los dos tipos de hook: el de los
+# archivos (pre-commit) y el del mensaje (commit-msg).
+default_install_hook_types: [pre-commit, commit-msg]
+# Por defecto los hooks corren al preparar el commit (no en el mensaje).
+default_stages: [pre-commit]
+
+repos:
+  # ---------------------------------------------------------------------------
+  # Higiene básica de archivos
+  # ---------------------------------------------------------------------------
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace          # espacios al final de las líneas
+        args: [--markdown-linebreak-ext=md]
+      - id: end-of-file-fixer            # un salto de línea al final de cada archivo
+      - id: mixed-line-ending            # todos los saltos de línea en formato LF
+        args: [--fix=lf]
+      - id: check-yaml                   # YAML válido (docker-compose, workflows)
+      - id: check-json                   # JSON válido (colección de Postman, configs)
+        # tsconfig.json admite comentarios (no es JSON estricto).
+        exclude: ^apps/web/tsconfig\.json$
+      - id: check-toml                   # TOML válido (pyproject, ruff.toml)
+      - id: check-merge-conflict         # restos de conflictos (<<<<<<<)
+      - id: check-case-conflict          # nombres que chocan en macOS/Windows
+      - id: check-added-large-files      # evita subir binarios grandes por error
+        args: [--maxkb=1024]
+      - id: detect-private-key           # claves privadas (PEM, SSH...)
+
+  # ---------------------------------------------------------------------------
+  # Secretos: gitleaks revisa lo que se va a commitear (tokens, contraseñas,
+  # claves de API...). Los .env ya están en .gitignore; esto protege de
+  # copiarlos por error en otro archivo.
+  # ---------------------------------------------------------------------------
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+
+  # ---------------------------------------------------------------------------
+  # Python (services/ y libs/): Ruff como linter y formateador.
+  # Configuración en ruff.toml (raíz).
+  # ---------------------------------------------------------------------------
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.17.3
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+        files: ^(services|libs)/
+      - id: ruff-format
+        files: ^(services|libs)/
+
+  # ---------------------------------------------------------------------------
+  # Mensaje de commit: Conventional Commits (lo necesita release-please).
+  # Los tipos y scopes son los MISMOS que en .github/workflows/pr-title.yml:
+  # si añades un scope, actualízalo en los dos sitios.
+  # Los mensajes "Merge branch ..." de los merges locales se aceptan.
+  # ---------------------------------------------------------------------------
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v4.5.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]
+        args:
+          - --scopes=api-autos,api-usuarios,auth-jwt,web,docs,monorepo,main
+          - feat
+          - fix
+          - perf
+          - refactor
+          - docs
+          - test
+          - build
+          - ci
+          - chore
+          - revert

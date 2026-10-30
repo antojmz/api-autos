@@ -14,12 +14,12 @@ from fastapi import APIRouter, Depends, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlmodel import or_, select
 
-from auth_jwt import Rol, crear_token_acceso, error_401
 from app.dependencies import SessionDep
 from app.models import Usuario
 from app.schemas import PASSWORD_MAX, RegistroUsuario, Token, UsuarioPublic
 from app.seguridad import simular_verificacion, verificar_password
 from app.servicios import crear_usuario
+from auth_jwt import Rol, crear_token_acceso, error_401
 
 router = APIRouter(prefix="/auth", tags=["Autenticación"])
 

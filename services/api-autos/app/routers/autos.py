@@ -15,13 +15,13 @@ función Python a un método HTTP + ruta. Parámetros útiles:
 
 from typing import Annotated
 
-from auth_jwt import Rol, obtener_claims, requiere_rol
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlmodel import col, func, select
 
 from app.dependencies import AutoDep, PaginacionDep, SessionDep
 from app.models import Auto, Modelo
 from app.schemas import AutoCreate, AutoPublic, AutoUpdate, Pagina
+from auth_jwt import Rol, obtener_claims, requiere_rol
 
 # prefix: todas las rutas de este router empiezan con /autos.
 # tags: agrupa los endpoints bajo "Autos" en la documentación /docs.
@@ -88,9 +88,7 @@ def listar_autos(
     # cuántas páginas hay).
     total = session.exec(select(func.count()).select_from(consulta.subquery())).one()
 
-    autos = session.exec(
-        consulta.order_by(col(Auto.id)).offset(paginacion.skip).limit(paginacion.limit)
-    ).all()
+    autos = session.exec(consulta.order_by(col(Auto.id)).offset(paginacion.skip).limit(paginacion.limit)).all()
 
     return Pagina[AutoPublic](
         total=total,
