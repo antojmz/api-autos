@@ -8,9 +8,9 @@ alta por admin y creación del admin inicial crean usuarios de la misma forma).
 from fastapi import HTTPException, status
 from sqlmodel import Session, or_, select
 
-from auth_jwt import Rol
 from app.models import Usuario, ahora_utc
 from app.seguridad import hashear_password
+from auth_jwt import Rol
 
 
 def verificar_unicidad(

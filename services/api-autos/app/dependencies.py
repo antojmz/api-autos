@@ -40,9 +40,7 @@ def parametros_paginacion(
     skip: Annotated[int, Query(ge=0, description="Registros a saltar")] = 0,
     # Limitar el tamaño de página evita respuestas enormes que saturen el
     # servidor (OWASP API4: consumo de recursos sin restricción).
-    limit: Annotated[
-        int, Query(ge=1, le=LIMITE_MAXIMO_PAGINA, description="Máximo de registros")
-    ] = 10,
+    limit: Annotated[int, Query(ge=1, le=LIMITE_MAXIMO_PAGINA, description="Máximo de registros")] = 10,
 ) -> Paginacion:
     return Paginacion(skip=skip, limit=limit)
 

@@ -31,13 +31,13 @@ from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlmodel import Session, select
 
-from auth_jwt import Rol, get_config_jwt
 from app.config import settings
 from app.database import engine
 from app.models import Usuario
 from app.routers import auth, usuarios
 from app.schemas import UsuarioCreateAdmin
 from app.servicios import crear_usuario
+from auth_jwt import Rol, get_config_jwt
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger("api_usuarios")
@@ -153,8 +153,7 @@ async def manejar_error_validacion(request: Request, exc: RequestValidationError
     contraseña!
     """
     errores = [
-        {"campo": ".".join(str(parte) for parte in error["loc"]), "mensaje": error["msg"]}
-        for error in exc.errors()
+        {"campo": ".".join(str(parte) for parte in error["loc"]), "mensaje": error["msg"]} for error in exc.errors()
     ]
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,

@@ -1,0 +1,32 @@
+# =============================================================================
+# ruff.toml — Configuración de Ruff (linter + formateador de Python) para todo
+# el monorepo (services/ y libs/). Lo ejecuta pre-commit (ver
+# .pre-commit-config.yaml) y también se puede usar a mano: `ruff check .`
+# =============================================================================
+
+target-version = "py313"
+# El código del proyecto usa líneas de hasta ~115 caracteres (comentarios
+# didácticos largos); 120 evita partirlas artificialmente.
+line-length = 120
+
+[lint]
+select = [
+    "E",    # errores de estilo (pycodestyle)
+    "F",    # errores lógicos: variables sin usar, imports que faltan (pyflakes)
+    "I",    # orden de los imports (isort)
+    "UP",   # sintaxis moderna de Python (pyupgrade)
+    "B",    # errores probables (flake8-bugbear)
+    "SIM",  # simplificaciones (flake8-simplify)
+]
+ignore = [
+    # "if condición: return False / return True" es más fácil de leer para
+    # quien aprende que "return not (condición)"; el proyecto es didáctico.
+    "SIM103",
+]
+
+[lint.isort]
+# Paquetes propios del proyecto: se agrupan después de los de terceros.
+known-first-party = ["app", "auth_jwt"]
+
+[format]
+quote-style = "double"

@@ -80,7 +80,7 @@ ci: cachear la instalación de dependencias
 **Opción con merge local** (`git merge --no-ff feature/x` y `git push`):
 - release-please lee los commits de la rama, que deben ser convencionales.
 - Los commits `Merge branch '...'` se ignoran.
-- En este caso no hay PR, así que no actúa la validación automática: revisa tú los mensajes.
+- En este caso no hay PR, así que no actúa el workflow `pr-title`. Los mensajes los valida en tu máquina el **hook `commit-msg` de pre-commit**, si lo instalaste (`just hooks`): rechaza el commit si el mensaje no es convencional. Los `Merge branch ...` se aceptan.
 
 ## Nombres de rama y título automático del PR
 

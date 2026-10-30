@@ -106,6 +106,27 @@ Deja `DB_HOST=localhost`. Dentro de un contenedor, `localhost` es el propio cont
 
 El administrador inicial se crea solo en el primer arranque, si en la base no hay ningún admin.
 
+### Paso 4. *(Para quien va a hacer commits)* Instalar los hooks de pre-commit
+
+Antes de cada `git commit`, [pre-commit](https://pre-commit.com) revisa automáticamente lo que vas a subir:
+
+| Revisión | Qué hace |
+|---|---|
+| Higiene de archivos | Quita espacios finales, añade el salto de línea final, valida YAML, JSON y TOML, y detecta restos de conflictos de merge, archivos de más de 1 MB y claves privadas |
+| **Secretos** ([gitleaks](https://github.com/gitleaks/gitleaks)) | Bloquea el commit si encuentra tokens, contraseñas o claves (por ejemplo, el contenido de un `.env` pegado por error) |
+| **Python** ([Ruff](https://docs.astral.sh/ruff/)) | Lint y formato de `services/` y `libs/` (configuración en `ruff.toml`) |
+| **Mensaje del commit** | Debe seguir Conventional Commits (`feat(api-autos): ...`, `fix: ...`), porque release-please calcula la versión con él. Los `Merge branch ...` se aceptan |
+
+```bash
+brew install pre-commit      # una vez (alternativa: pipx install pre-commit)
+just hooks                   # instala los hooks en este clon (just setup también lo hace)
+# sin just:  pre-commit install --install-hooks
+```
+
+- **Si un hook corrige algo** (formato o espacios), el commit se detiene: revisa los cambios con `git diff`, vuelve a hacer `git add` y repite el commit.
+- **Revisar todo el repositorio a mano**: `just lint` (o `pre-commit run --all-files`).
+- **Saltar los hooks** (`git commit --no-verify`) está desaconsejado, porque se pierde la protección contra secretos.
+
 ---
 
 ## Camino 1: APIs en Docker + frontend con `npm run dev`

@@ -21,9 +21,9 @@ from fastapi import Depends, HTTPException, Path, Query, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlmodel import Session
 
-from auth_jwt import Rol, TokenInvalido, decodificar_token, error_401
 from app.database import get_session
 from app.models import Usuario
+from auth_jwt import Rol, TokenInvalido, decodificar_token, error_401
 
 LIMITE_MAXIMO_PAGINA = 100
 
@@ -38,9 +38,7 @@ class Paginacion:
 
 def parametros_paginacion(
     skip: Annotated[int, Query(ge=0, description="Registros a saltar")] = 0,
-    limit: Annotated[
-        int, Query(ge=1, le=LIMITE_MAXIMO_PAGINA, description="Máximo de registros")
-    ] = 10,
+    limit: Annotated[int, Query(ge=1, le=LIMITE_MAXIMO_PAGINA, description="Máximo de registros")] = 10,
 ) -> Paginacion:
     return Paginacion(skip=skip, limit=limit)
 

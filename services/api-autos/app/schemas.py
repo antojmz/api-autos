@@ -135,15 +135,11 @@ class Pagina[T](BaseModel):
 # Tipos reutilizables de los campos de un modelo: los usan tanto la creación
 # (POST /modelo) como la actualización (PUT /modelos/{id}), así las reglas
 # están escritas una sola vez.
-NombreModelo = Annotated[
-    str, Field(min_length=1, max_length=60, pattern=PATRON_TEXTO_SEGURO, examples=["Corolla"])
-]
+NombreModelo = Annotated[str, Field(min_length=1, max_length=60, pattern=PATRON_TEXTO_SEGURO, examples=["Corolla"])]
 AnioModelo = Annotated[int, Field(ge=ANIO_MINIMO, examples=[2024]), AfterValidator(_anio_razonable)]
 # gt=0: precio estrictamente positivo. max_digits / decimal_places coinciden
 # con la columna NUMERIC(12, 2) para no truncar valores.
-PrecioModelo = Annotated[
-    Decimal, Field(gt=0, le=PRECIO_MAXIMO, max_digits=12, decimal_places=2, examples=[25990.00])
-]
+PrecioModelo = Annotated[Decimal, Field(gt=0, le=PRECIO_MAXIMO, max_digits=12, decimal_places=2, examples=[25990.00])]
 
 
 class ModeloCreate(EntradaEstricta):
